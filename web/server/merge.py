@@ -207,10 +207,17 @@ def merge_live_run(tracker: Optional[dict], save: Optional[dict]) -> dict:
                 floor_num += 1
                 floor = _build_floor(mp, floor_num, act_idx)
 
-                # Try to match combat data from tracker by floor number
+                # Try to match combat data from tracker
                 if tracker and floor["type"] in ("monster", "elite", "boss"):
+                    mp_rooms = mp.get("rooms", [])
+                    room_model = mp_rooms[0].get("model_id", "") if mp_rooms else ""
                     for combat in tracker.get("combats", []):
+                        # Match by floor number first
                         if combat.get("floor") == floor_num:
+                            floor["combat"] = combat
+                            break
+                        # Fall back to matching by encounter name
+                        if room_model and combat.get("encounter") == room_model:
                             floor["combat"] = combat
                             break
 
