@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  backend:
+    build: ./server
+    container_name: sts2-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - "${APPDATA}/SlayTheSpire2/tracker:/data/tracker:ro"
+      - "C:/Program Files (x86)/Steam/userdata/76657349/2868840/remote/profile1/saves:/data/saves:ro"
+    environment:
+      - STS2_TRACKER_DIR=/data/tracker
+      - STS2_SAVES_DIR=/data/saves
+      - STS2_HOST=0.0.0.0
+      - STS2_PORT=8000
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: sts2-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

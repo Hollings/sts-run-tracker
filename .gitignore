@@ -1,0 +1,26 @@
+# Decompiled game code (large, regenerable)
+decompiled/
+
+# Build artifacts
+StS2Tracker/bin/
+StS2Tracker/obj/
+
+# Frontend build + deps
+web/frontend/node_modules/
+web/frontend/dist/
+
+# Python
+__pycache__/
+*.pyc
+
+# IDE
+.vs/
+*.suo
+*.user
+
+# Claude Code
+.claude/
+
+# OS
+Thumbs.db
+.DS_Store

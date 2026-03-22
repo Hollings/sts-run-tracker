@@ -1,0 +1,91 @@
+/**
+ * Format a game ID like "CARD.STRIKE_IRONCLAD" into "Strike Ironclad".
+ * Splits on first dot, replaces underscores with spaces, title-cases.
+ */
+export function formatGameId(id: string): string {
+  if (!id || id === "NONE.NONE") return "";
+  const dotIndex = id.indexOf(".");
+  const name = dotIndex >= 0 ? id.slice(dotIndex + 1) : id;
+  return name
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * Format seconds into human-readable duration like "1h 23m 45s".
+ */
+export function formatDuration(seconds: number): string {
+  if (seconds <= 0) return "0s";
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  const parts: string[] = [];
+  if (h > 0) parts.push(`${h}h`);
+  if (m > 0) parts.push(`${m}m`);
+  if (s > 0 || parts.length === 0) parts.push(`${s}s`);
+  return parts.join(" ");
+}
+
+/**
+ * Format a Unix timestamp into a readable date string.
+ */
+export function formatDate(timestamp: number): string {
+  if (!timestamp) return "";
+  const d = new Date(timestamp * 1000);
+  return d.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/**
+ * Get a color class for room types.
+ */
+export function roomTypeColor(roomType: string): string {
+  switch (roomType) {
+    case "monster":
+      return "text-sts-red";
+    case "elite":
+      return "text-sts-amber";
+    case "boss":
+      return "text-sts-purple";
+    case "event":
+      return "text-sts-blue";
+    case "shop":
+      return "text-sts-green";
+    case "rest":
+      return "text-green-400";
+    case "treasure":
+      return "text-yellow-400";
+    default:
+      return "text-sts-text-dim";
+  }
+}
+
+/**
+ * Get a background color class for room types.
+ */
+export function roomTypeBg(roomType: string): string {
+  switch (roomType) {
+    case "monster":
+      return "bg-red-900/30";
+    case "elite":
+      return "bg-amber-900/30";
+    case "boss":
+      return "bg-purple-900/30";
+    case "event":
+      return "bg-blue-900/30";
+    case "shop":
+      return "bg-green-900/30";
+    case "rest":
+      return "bg-green-900/20";
+    case "treasure":
+      return "bg-yellow-900/30";
+    default:
+      return "bg-sts-card";
+  }
+}

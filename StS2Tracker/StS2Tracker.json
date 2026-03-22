@@ -1,0 +1,10 @@
+{
+  "id": "StS2Tracker",
+  "name": "StS2 Run Tracker",
+  "author": "jhol",
+  "description": "Tracks detailed per-player combat stats (damage dealt, block, cards played, powers) and exports them as JSON for analysis.",
+  "version": "0.1.0",
+  "has_dll": true,
+  "has_pck": false,
+  "affects_gameplay": false
+}
