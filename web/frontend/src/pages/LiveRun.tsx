@@ -366,6 +366,23 @@ function BestHitDisplay({
 // Floor card component
 // ---------------------------------------------------------------------------
 
+function ChevronDown({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      className={className || "w-5 h-5"}
+    >
+      <path
+        fillRule="evenodd"
+        d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
+
 function FloorCard({
   floor,
   expanded,
@@ -375,7 +392,7 @@ function FloorCard({
   expanded: boolean;
   onToggle: () => void;
 }) {
-  const hasCombat = isCombatFloor(floor.type);
+  const hasCombat = !!floor.combat;
   const typeLabel = FLOOR_TYPE_LABELS[floor.type] || floor.type;
   const icon = FLOOR_TYPE_ICONS[floor.type] || "?";
 
@@ -386,10 +403,7 @@ function FloorCard({
       )} bg-sts-surface`}
     >
       {/* Header - always visible */}
-      <button
-        className="w-full px-4 py-3 flex items-center justify-between hover:bg-sts-card/50 text-left"
-        onClick={onToggle}
-      >
+      <div className="px-4 py-3 flex items-center justify-between text-left">
         <div className="flex items-center gap-3">
           {/* Type badge */}
           <span
@@ -444,39 +458,45 @@ function FloorCard({
               {floor.combat.result === "win" ? "WIN" : "LOSS"}
             </span>
           )}
-          <span className="text-sts-text-dim">
-            {expanded ? "[-]" : "[+]"}
-          </span>
         </div>
-      </button>
+      </div>
 
-      {/* Expanded content */}
-      {expanded && (
-        <div className="px-4 pb-4 space-y-4">
-          {/* Per-player floor stats */}
-          <div
-            className={`grid gap-3 ${
-              floor.players.length > 1 ? "md:grid-cols-2" : "grid-cols-1"
+      {/* Per-player floor stats - always visible */}
+      <div className="px-4 pb-3">
+        <div
+          className={`grid gap-3 ${
+            floor.players.length > 1 ? "md:grid-cols-2" : "grid-cols-1"
+          }`}
+        >
+          {floor.players.map((p, i) => (
+            <FloorPlayerCard key={i} player={p} floorType={floor.type} />
+          ))}
+        </div>
+      </div>
+
+      {/* Expand/collapse button for combat floors */}
+      {hasCombat && (
+        <button
+          className="w-full px-4 py-2 flex items-center justify-center gap-2 text-sm font-medium text-sts-gold-light hover:bg-sts-card/50 border-t border-sts-border/50 transition-colors"
+          onClick={onToggle}
+        >
+          <span>{expanded ? "Hide Combat Detail" : "Show Combat Detail"}</span>
+          <ChevronDown
+            className={`w-4 h-4 transition-transform duration-200 ${
+              expanded ? "rotate-180" : ""
             }`}
-          >
-            {floor.players.map((p, i) => (
-              <FloorPlayerCard key={i} player={p} floorType={floor.type} />
-            ))}
-          </div>
+          />
+        </button>
+      )}
 
-          {/* If combat floor with tracker data, show full combat detail */}
-          {floor.combat && (
-            <div className="mt-4">
-              <h4 className="text-sm font-semibold text-sts-text-dim mb-2">
-                Combat Breakdown
-              </h4>
-              <CombatDetail
-                combat={floor.combat}
-                index={floor.floor}
-                expanded={true}
-              />
-            </div>
-          )}
+      {/* Expanded combat detail */}
+      {hasCombat && expanded && floor.combat && (
+        <div className="px-4 pb-4 pt-2 border-t border-sts-border/50 space-y-4">
+          <CombatDetail
+            combat={floor.combat}
+            index={floor.floor}
+            expanded={true}
+          />
         </div>
       )}
     </div>
