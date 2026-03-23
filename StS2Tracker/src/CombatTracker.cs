@@ -19,9 +19,15 @@ public static class CombatTracker
     private static readonly List<CombatData> _combats = new();
     private static CombatData? _current;
     private static int _turnNumber;
+    private static readonly Dictionary<string, int> _playerTurns = new();
     private static RunInfo? _runInfo;
     private static string? _outputPath;
     private static readonly string _outputDir;
+    private static readonly JsonSerializerOptions s_jsonOptions = new()
+    {
+        WriteIndented = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    };
 
     static CombatTracker()
     {
@@ -35,6 +41,7 @@ public static class CombatTracker
         _combats.Clear();
         _current = null;
         _turnNumber = 0;
+        _playerTurns.Clear();
         _runInfo = null;
         _outputPath = null;
         ModEntry.Log("CombatTracker initialized. Output dir: " + _outputDir);
@@ -47,6 +54,18 @@ public static class CombatTracker
         if (combatState == null) return;
 
         _turnNumber = 0;
+        _playerTurns.Clear();
+
+        // Detect new run: if the seed changed, reinitialize everything
+        if (runState != null && _runInfo != null)
+        {
+            string currentSeed = runState.Rng?.StringSeed ?? "unknown";
+            if (currentSeed != _runInfo.Seed)
+            {
+                ModEntry.Log($"New run detected (seed changed: {_runInfo.Seed} -> {currentSeed}). Resetting tracker.");
+                Initialize();
+            }
+        }
 
         // Capture run info once on first combat
         if (_runInfo == null && runState != null)
@@ -115,7 +134,7 @@ public static class CombatTracker
         _current.Result = victory ? "win" : "loss";
 
         // Replace in-progress entry if we had one, otherwise add
-        int existingIdx = _combats.FindIndex(c => c.Encounter == _current.Encounter && c.Result == "in_progress");
+        int existingIdx = _combats.FindIndex(c => c.Encounter == _current.Encounter && c.Floor == _current.Floor && c.Result == "in_progress");
         if (existingIdx >= 0)
             _combats[existingIdx] = _current;
         else
@@ -137,6 +156,13 @@ public static class CombatTracker
     public static void OnTurnStart(Player player)
     {
         _turnNumber++;
+
+        // Track per-player turn count
+        string pid = player.NetId.ToString();
+        if (!_playerTurns.ContainsKey(pid))
+            _playerTurns[pid] = 0;
+        _playerTurns[pid]++;
+
         FlushInProgress();
     }
 
@@ -152,7 +178,7 @@ public static class CombatTracker
         _current.Result = "in_progress";
 
         // Add or update the in-progress entry
-        int existingIdx = _combats.FindIndex(c => c.Encounter == _current.Encounter && c.Result == "in_progress");
+        int existingIdx = _combats.FindIndex(c => c.Encounter == _current.Encounter && c.Floor == _current.Floor && c.Result == "in_progress");
         if (existingIdx >= 0)
             _combats[existingIdx] = _current;
         else
@@ -269,6 +295,48 @@ public static class CombatTracker
         }
     }
 
+    public static void OnPowerChanged(PowerModel power, int amount, Creature? applier)
+    {
+        if (_current == null) return;
+
+        string powerId = power.Id.ToString();
+        Creature target = power.Owner;
+        string targetId = target.ModelId.ToString();
+        string? applierId = applier?.ModelId.ToString();
+
+        // Track on the applier player (buffs/debuffs they caused)
+        string? applierPid = GetPlayerId(applier);
+        if (applierPid != null && _current.Players.TryGetValue(applierPid, out var applierStats))
+        {
+            if (!applierStats.PowersApplied.ContainsKey(powerId))
+                applierStats.PowersApplied[powerId] = 0;
+            applierStats.PowersApplied[powerId] += amount;
+        }
+
+        // Track on the target player (buffs/debuffs they received)
+        string? targetPid = GetPlayerId(target);
+        if (targetPid != null && _current.Players.TryGetValue(targetPid, out var targetStats))
+        {
+            if (!targetStats.PowersReceived.ContainsKey(powerId))
+                targetStats.PowersReceived[powerId] = 0;
+            targetStats.PowersReceived[powerId] += amount;
+        }
+
+        // Log the event on whichever player is involved (prefer target, fall back to applier)
+        string? logPid = targetPid ?? applierPid;
+        if (logPid != null && _current.Players.TryGetValue(logPid, out var logStats))
+        {
+            logStats.PowerLog.Add(new PowerEventEntry
+            {
+                Power = powerId,
+                Stacks = amount,
+                Target = targetId,
+                Source = applierId,
+                Turn = _turnNumber,
+            });
+        }
+    }
+
     // --- Helpers ---
 
     private static string? GetPlayerId(Creature? creature)
@@ -281,17 +349,23 @@ public static class CombatTracker
         return null;
     }
 
+    private static int GetPlayerTurnCount(string pid)
+    {
+        return _playerTurns.TryGetValue(pid, out int count) ? count : 1;
+    }
+
     private static void EnsureTurnEntry(PlayerCombatStats stats)
     {
-        while (stats.DamagePerTurn.Count < _turnNumber)
+        int turnCount = GetPlayerTurnCount(stats.SteamId);
+        while (stats.DamagePerTurn.Count < turnCount)
             stats.DamagePerTurn.Add(0);
-        while (stats.BlockPerTurn.Count < _turnNumber)
+        while (stats.BlockPerTurn.Count < turnCount)
             stats.BlockPerTurn.Add(0);
-        while (stats.CardsPerTurn.Count < _turnNumber)
+        while (stats.CardsPerTurn.Count < turnCount)
             stats.CardsPerTurn.Add(0);
-        while (stats.DamageTakenPerTurn.Count < _turnNumber)
+        while (stats.DamageTakenPerTurn.Count < turnCount)
             stats.DamageTakenPerTurn.Add(0);
-        while (stats.DamageBlockedPerTurn.Count < _turnNumber)
+        while (stats.DamageBlockedPerTurn.Count < turnCount)
             stats.DamageBlockedPerTurn.Add(0);
     }
 
@@ -311,12 +385,10 @@ public static class CombatTracker
                 Combats = _combats.ToList(),
             };
 
-            string json = JsonSerializer.Serialize(runData, new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-            });
-            File.WriteAllText(_outputPath, json);
+            string json = JsonSerializer.Serialize(runData, s_jsonOptions);
+            string tempPath = _outputPath + ".tmp";
+            File.WriteAllText(tempPath, json);
+            File.Move(tempPath, _outputPath, overwrite: true);
             ModEntry.Log($"Wrote tracker data to {_outputPath} ({json.Length} bytes, {_combats.Count} combats)");
         }
         catch (Exception ex)
@@ -446,6 +518,15 @@ public class PlayerCombatStats
 
     [JsonPropertyName("hits_received")]
     public List<HitReceivedEntry> HitsReceived { get; set; } = new();
+
+    [JsonPropertyName("powers_applied")]
+    public Dictionary<string, int> PowersApplied { get; set; } = new();
+
+    [JsonPropertyName("powers_received")]
+    public Dictionary<string, int> PowersReceived { get; set; } = new();
+
+    [JsonPropertyName("power_log")]
+    public List<PowerEventEntry> PowerLog { get; set; } = new();
 }
 
 public class CardDamageStats
@@ -503,6 +584,24 @@ public class CardPlayEntry
 
     [JsonPropertyName("target")]
     public string? Target { get; set; }
+
+    [JsonPropertyName("turn")]
+    public int Turn { get; set; }
+}
+
+public class PowerEventEntry
+{
+    [JsonPropertyName("power")]
+    public string Power { get; set; } = "";
+
+    [JsonPropertyName("stacks")]
+    public int Stacks { get; set; }
+
+    [JsonPropertyName("target")]
+    public string Target { get; set; } = "";
+
+    [JsonPropertyName("source")]
+    public string? Source { get; set; }
 
     [JsonPropertyName("turn")]
     public int Turn { get; set; }

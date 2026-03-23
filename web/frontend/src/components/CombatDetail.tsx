@@ -19,6 +19,7 @@ export default function CombatDetail({
   onToggle,
 }: Props) {
   const isWin = combat.result === "win";
+  const isInProgress = combat.result === "in_progress";
   const playerEntries = Object.entries(combat.players);
 
   return (
@@ -31,11 +32,11 @@ export default function CombatDetail({
         <div className="flex items-center gap-3">
           <span
             className={`inline-block w-3 h-3 rounded-full ${
-              isWin ? "bg-sts-green" : "bg-sts-red"
+              isInProgress ? "bg-yellow-500" : isWin ? "bg-sts-green" : "bg-sts-red"
             }`}
           />
           <span className="font-semibold text-sts-gold">
-            Floor {combat.floor_index}
+            Floor {combat.floor}
           </span>
           <span className="text-sts-text">
             {formatGameId(combat.encounter)}
@@ -48,8 +49,8 @@ export default function CombatDetail({
           <span className="text-sts-text-dim">
             {combat.total_turns} turn{combat.total_turns !== 1 ? "s" : ""}
           </span>
-          <span className={isWin ? "text-sts-green font-bold" : "text-sts-red font-bold"}>
-            {isWin ? "WIN" : "LOSS"}
+          <span className={isInProgress ? "text-yellow-400 font-bold" : isWin ? "text-sts-green font-bold" : "text-sts-red font-bold"}>
+            {isInProgress ? "IN PROGRESS" : isWin ? "WIN" : "LOSS"}
           </span>
           <span className="text-sts-text-dim">
             {expanded ? "[-]" : "[+]"}

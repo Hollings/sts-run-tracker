@@ -30,12 +30,31 @@ export interface PlayerCombatStats {
   card_sequence: CardPlay[];
   damage_by_target: Record<string, number>;
   damage_by_card: Record<string, CardDamage>;
+  damage_taken_per_turn: number[];
+  damage_blocked_per_turn: number[];
+  damage_taken_by_source: Record<string, DamageTakenSource>;
+  hits_received: HitReceived[];
+}
+
+export interface DamageTakenSource {
+  unblocked: number;
+  blocked: number;
+  hits: number;
+  max_hit: number;
+}
+
+export interface HitReceived {
+  source: string;
+  unblocked: number;
+  blocked: number;
+  turn: number;
+  was_killed: boolean;
 }
 
 export interface Combat {
   encounter: string;
   monsters: string[];
-  floor_index: number;
+  floor: number;
   total_turns: number;
   result: string;
   players: Record<string, PlayerCombatStats>;
@@ -43,8 +62,7 @@ export interface Combat {
 
 export interface TrackerData {
   mod_version: string;
-  seed: string;
-  start_time: number;
+  run_info: RunInfo;
   combats: Combat[];
 }
 

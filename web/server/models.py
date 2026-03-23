@@ -38,21 +38,33 @@ class PlayerCombatStats(BaseModel):
     card_sequence: list[CardPlay] = []
     damage_by_target: dict[str, int] = {}
     damage_by_card: dict[str, CardDamage] = {}
+    damage_taken_per_turn: list[int] = []
+    damage_blocked_per_turn: list[int] = []
+    damage_taken_by_source: dict[str, dict] = {}
+    hits_received: list[dict] = []
 
 
 class Combat(BaseModel):
     encounter: str
     monsters: list[str] = []
-    floor_index: int = 0
+    floor: int = 0
     total_turns: int = 0
     result: str = "unknown"
     players: dict[str, PlayerCombatStats] = {}
 
 
-class TrackerData(BaseModel):
-    mod_version: str = "0.0.0"
+class TrackerRunInfo(BaseModel):
     seed: str = ""
     start_time: int = 0
+    ascension: int = 0
+    game_mode: str = "standard"
+    acts: list[str] = []
+    players: list[dict] = []
+
+
+class TrackerData(BaseModel):
+    mod_version: str = "0.0.0"
+    run_info: TrackerRunInfo = TrackerRunInfo()
     combats: list[Combat] = []
 
 

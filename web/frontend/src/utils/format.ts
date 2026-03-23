@@ -43,48 +43,55 @@ export function formatDate(timestamp: number): string {
 }
 
 /**
- * Get a color class for room types.
+ * Get a color class for room/floor types.
+ * Shared by RunDetail and any other component that needs room-type colors.
  */
 export function roomTypeColor(roomType: string): string {
   switch (roomType) {
     case "monster":
-      return "text-sts-red";
+      return "text-red-400";
     case "elite":
-      return "text-sts-amber";
+      return "text-amber-400";
     case "boss":
-      return "text-sts-purple";
-    case "event":
-      return "text-sts-blue";
-    case "shop":
-      return "text-sts-green";
-    case "rest":
+      return "text-purple-400";
+    case "ancient":
+      return "text-purple-300";
+    case "rest_site":
       return "text-green-400";
     case "treasure":
       return "text-yellow-400";
+    case "shop":
+      return "text-emerald-400";
+    case "event":
+    case "unknown":
+      return "text-blue-400";
     default:
       return "text-sts-text-dim";
   }
 }
 
 /**
- * Get a background color class for room types.
+ * Get a background color class for room/floor types.
  */
 export function roomTypeBg(roomType: string): string {
   switch (roomType) {
     case "monster":
-      return "bg-red-900/30";
+      return "bg-red-900/25";
     case "elite":
-      return "bg-amber-900/30";
+      return "bg-amber-900/25";
     case "boss":
-      return "bg-purple-900/30";
-    case "event":
-      return "bg-blue-900/30";
-    case "shop":
-      return "bg-green-900/30";
-    case "rest":
+      return "bg-purple-900/25";
+    case "ancient":
+      return "bg-purple-900/20";
+    case "rest_site":
       return "bg-green-900/20";
     case "treasure":
-      return "bg-yellow-900/30";
+      return "bg-yellow-900/20";
+    case "shop":
+      return "bg-emerald-900/20";
+    case "event":
+    case "unknown":
+      return "bg-blue-900/20";
     default:
       return "bg-sts-card";
   }

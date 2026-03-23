@@ -450,12 +450,14 @@ function FloorCard({
           {hasCombat && floor.combat && (
             <span
               className={
-                floor.combat.result === "win"
+                floor.combat.result === "in_progress"
+                  ? "text-yellow-400 font-bold"
+                  : floor.combat.result === "win"
                   ? "text-sts-green font-bold"
                   : "text-sts-red font-bold"
               }
             >
-              {floor.combat.result === "win" ? "WIN" : "LOSS"}
+              {floor.combat.result === "in_progress" ? "FIGHTING" : floor.combat.result === "win" ? "WIN" : "LOSS"}
             </span>
           )}
         </div>

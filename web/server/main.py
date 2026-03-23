@@ -143,7 +143,7 @@ app = FastAPI(title="StS2 Tracker", version="0.1.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -165,7 +165,7 @@ def _build_merged_live() -> dict[str, Any] | None:
 
 
 @app.get("/api/live")
-async def get_live_data() -> dict[str, Any]:
+def get_live_data() -> dict[str, Any]:
     """Return merged live data from tracker + game save."""
     merged = _build_merged_live()
     if merged is None:
@@ -174,7 +174,7 @@ async def get_live_data() -> dict[str, Any]:
 
 
 @app.get("/api/runs")
-async def list_runs() -> list[dict[str, Any]]:
+def list_runs() -> list[dict[str, Any]]:
     """Return summary of all historical runs from both modded and unmodded saves."""
     # Collect runs from both save paths, deduplicating by filename
     seen_filenames: set[str] = set()
@@ -218,7 +218,7 @@ async def list_runs() -> list[dict[str, Any]]:
 
 
 @app.get("/api/runs/{filename}")
-async def get_run_detail(filename: str) -> dict[str, Any]:
+def get_run_detail(filename: str) -> dict[str, Any]:
     """Return full run data for a specific save file (checks both save dirs)."""
     # Search both modded and unmodded history directories
     for history_dir in [
@@ -235,7 +235,7 @@ async def get_run_detail(filename: str) -> dict[str, Any]:
 
 
 @app.get("/api/progress")
-async def get_progress() -> dict[str, Any]:
+def get_progress() -> dict[str, Any]:
     """Return lifetime stats from progress.save."""
     data = read_progress(_get_progress_file())
     if data is None:

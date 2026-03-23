@@ -117,16 +117,37 @@ static async Task AfterTurnEnd(CombatState combatState, CombatSide side)
 
 ### Power Hooks
 ```csharp
-static async Task AfterPowerApplied(
-    PlayerChoiceContext choiceContext,
+// Fired after a power's stacks change (positive = gained, negative = lost).
+// The target creature is power.Owner. Amount is decimal in the hook but
+// typically integral. Also available: BeforePowerAmountChanged (has target param).
+static async Task AfterPowerAmountChanged(
     CombatState combatState,
-    PowerModel power,
-    Creature target,
-    int amount,
-    Creature? source
+    PowerModel power,           // power.Owner = creature that has it, power.Id = POWER.STRENGTH etc.
+    decimal amount,             // stacks changed (positive = gain, negative = loss)
+    Creature? applier,          // who caused the change (null for system/self)
+    CardModel? cardSource       // which card caused it (null for non-card)
 )
 
-static async Task AfterPowerRemoved(CombatState combatState, PowerModel power, Creature creature)
+// Before version (includes explicit target param):
+static async Task BeforePowerAmountChanged(
+    CombatState combatState,
+    PowerModel power,
+    decimal amount,
+    Creature target,            // who receives the power
+    Creature? applier,
+    CardModel? cardSource
+)
+
+// NOTE: AfterPowerApplied and AfterPowerRemoved do NOT exist on the Hook class.
+// The HOOKS_REFERENCE.md previously listed these incorrectly. Use
+// AfterPowerAmountChanged instead.
+```
+
+### Power Modifiers (also available)
+```csharp
+// Fired after modifying the amount of power given/received (for relics/powers that modify)
+static async Task AfterModifyingPowerAmountGiven(CombatState combatState, IEnumerable<AbstractModel> modifiers, PowerModel modifiedPower)
+static async Task AfterModifyingPowerAmountReceived(CombatState combatState, IEnumerable<AbstractModel> modifiers, PowerModel modifiedPower)
 ```
 
 ---

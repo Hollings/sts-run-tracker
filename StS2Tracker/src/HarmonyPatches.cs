@@ -118,4 +118,23 @@ public static class HarmonyPatches
             ModEntry.Log("ERROR in AfterPlayerTurnStart patch: " + ex);
         }
     }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(nameof(Hook.AfterPowerAmountChanged))]
+    public static void AfterPowerAmountChanged_Postfix(
+        CombatState combatState,
+        PowerModel power,
+        decimal amount,
+        Creature? applier,
+        CardModel? cardSource)
+    {
+        try
+        {
+            CombatTracker.OnPowerChanged(power, (int)amount, applier);
+        }
+        catch (Exception ex)
+        {
+            ModEntry.Log("ERROR in AfterPowerAmountChanged patch: " + ex);
+        }
+    }
 }

@@ -18,13 +18,6 @@
   background: #3a4a6c;
 }
 
-/* Smooth transitions */
-* {
-  transition-property: background-color, border-color, color, opacity;
-  transition-duration: 150ms;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-}
-
 /* HP bar animation */
 @keyframes hp-pulse {
   0%, 100% { opacity: 1; }

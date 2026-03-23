@@ -22,13 +22,32 @@ TRACKER_DIR = os.environ.get(
     "STS2_TRACKER_DIR",
     os.path.join(os.environ.get("APPDATA", ""), "SlayTheSpire2", "tracker")
 )
-SAVE_DIR = os.environ.get(
-    "STS2_SAVE_DIR",
-    os.path.join(
+def _discover_save_dir() -> str:
+    """Auto-discover the Steam save directory for StS2."""
+    env_override = os.environ.get("STS2_SAVE_DIR")
+    if env_override:
+        return env_override
+    steam_base = os.path.join(
         os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"),
-        "Steam", "userdata", "76657349", "2868840", "remote"
+        "Steam", "userdata"
     )
-)
+    if os.path.isdir(steam_base):
+        # Scan all Steam user directories for StS2 app data (2868840)
+        candidates = []
+        for user_id in os.listdir(steam_base):
+            remote_dir = os.path.join(steam_base, user_id, "2868840", "remote")
+            if os.path.isdir(remote_dir):
+                candidates.append(remote_dir)
+        if candidates:
+            # Prefer the one with the most recent save data
+            if len(candidates) == 1:
+                return candidates[0]
+            return max(candidates, key=lambda d: os.path.getmtime(d))
+    # Fallback
+    return os.path.join(steam_base, "unknown", "2868840", "remote")
+
+
+SAVE_DIR = _discover_save_dir()
 
 
 def short_id(full_id: str) -> str:
@@ -200,6 +219,7 @@ def merge_live_run(tracker: Optional[dict], save: Optional[dict]) -> dict:
             }
 
         floor_num = 0
+        matched_combats: set[int] = set()
         for act_idx, act in enumerate(save.get("map_point_history", [])):
             if not isinstance(act, list):
                 continue
@@ -208,18 +228,26 @@ def merge_live_run(tracker: Optional[dict], save: Optional[dict]) -> dict:
                 floor = _build_floor(mp, floor_num, act_idx)
 
                 # Try to match combat data from tracker
-                if tracker and floor["type"] in ("monster", "elite", "boss"):
+                if tracker and floor["type"] in ("monster", "elite", "boss", "event", "unknown"):
                     mp_rooms = mp.get("rooms", [])
                     room_model = mp_rooms[0].get("model_id", "") if mp_rooms else ""
-                    for combat in tracker.get("combats", []):
+                    for ci, combat in enumerate(tracker.get("combats", [])):
+                        if ci in matched_combats:
+                            continue
                         # Match by floor number first
                         if combat.get("floor") == floor_num:
                             floor["combat"] = combat
+                            matched_combats.add(ci)
                             break
-                        # Fall back to matching by encounter name
-                        if room_model and combat.get("encounter") == room_model:
-                            floor["combat"] = combat
-                            break
+                    else:
+                        # Fall back to matching by encounter name (second pass)
+                        for ci, combat in enumerate(tracker.get("combats", [])):
+                            if ci in matched_combats:
+                                continue
+                            if room_model and combat.get("encounter") == room_model:
+                                floor["combat"] = combat
+                                matched_combats.add(ci)
+                                break
 
                 result["floors"].append(floor)
 

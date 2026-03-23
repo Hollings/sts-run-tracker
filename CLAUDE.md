@@ -89,6 +89,9 @@ React 19 + TypeScript + Vite + Tailwind CSS + recharts. Dark theme with amber/go
 - Player IDs are `1` in singleplayer, full Steam IDs (ulong) in multiplayer.
 - The mod flushes in-progress combat data to disk on every turn start and damage received, so death floors always have partial data.
 
+## Docs Maintenance
+- If reference docs (HOOKS_REFERENCE.md, DESIGN.md, WEB_SPEC.md) are discovered to be incorrect or missing info, update them immediately. Always decompile and verify actual game API signatures before trusting the docs - they've been wrong before (e.g. AfterPowerApplied doesn't exist, actual method is AfterPowerAmountChanged).
+
 ## Reference Documentation
 - `HOOKS_REFERENCE.md`: Full decompiled API surface - hook signatures, data types, identity chain, mod system details.
 - `DESIGN.md`: Project roadmap, MVP/Phase 2/Phase 3 goals, risk table.

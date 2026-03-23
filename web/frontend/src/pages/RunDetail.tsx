@@ -76,16 +76,20 @@ export default function RunDetail() {
     });
   });
 
-  // Build HP chart data from first player's perspective
+  // Build HP chart data for all players
+  const playerCount = run.players.length;
   const hpData = allFloors.map((f, i) => {
-    const ps = f.point.player_stats[0];
-    return {
+    const entry: Record<string, number | string> = {
       floor: i + 1,
-      hp: ps?.current_hp ?? 0,
-      maxHp: ps?.max_hp ?? 0,
       type: f.point.map_point_type,
     };
+    f.point.player_stats.forEach((ps, pi) => {
+      entry[`hp_${pi}`] = ps?.current_hp ?? 0;
+      entry[`maxHp_${pi}`] = ps?.max_hp ?? 0;
+    });
+    return entry;
   });
+  const playerColors = ["#ef4444", "#3b82f6", "#22c55e", "#a855f7"];
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
@@ -159,8 +163,12 @@ export default function RunDetail() {
                     name === "hp" ? "HP" : "Max HP",
                   ]}
                 />
-                <Bar dataKey="maxHp" fill="#2a3a5c" name="Max HP" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="hp" fill="#ef4444" name="HP" radius={[2, 2, 0, 0]} />
+                {Array.from({ length: playerCount }, (_, pi) => (
+                  <React.Fragment key={pi}>
+                    <Bar dataKey={`maxHp_${pi}`} fill="#2a3a5c" name={playerCount > 1 ? `P${pi + 1} Max HP` : "Max HP"} radius={[2, 2, 0, 0]} />
+                    <Bar dataKey={`hp_${pi}`} fill={playerColors[pi % playerColors.length]} name={playerCount > 1 ? `P${pi + 1} HP` : "HP"} radius={[2, 2, 0, 0]} />
+                  </React.Fragment>
+                ))}
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -267,25 +275,10 @@ function FloorRow({
   actIdx: number;
 }) {
   const room = point.rooms[0];
-  const ps = point.player_stats[0] as FloorPlayerStats | undefined;
   const roomType = room?.room_type || point.map_point_type;
   const roomName = room?.model_id
     ? formatGameId(room.model_id)
     : point.map_point_type;
-
-  // Cards gained this floor
-  const cardsGained = ps?.cards_gained?.map((c) => formatGameId(c.id)) || [];
-  const relicsGained =
-    ps?.relic_choices
-      ?.filter((r) => r.was_picked)
-      .map((r) => formatGameId(r.choice)) || [];
-  const potionsGained =
-    ps?.potion_choices
-      ?.filter((p) => p.was_picked)
-      .map((p) => formatGameId(p.choice)) || [];
-
-  const hpPct = ps && ps.max_hp > 0 ? (ps.current_hp / ps.max_hp) * 100 : 0;
-  const hpCritical = hpPct < 25;
 
   return (
     <div
@@ -312,64 +305,81 @@ function FloorRow({
         {roomName}
       </span>
 
-      {/* HP bar */}
-      {ps && (
-        <div className="flex items-center gap-2 w-40">
-          <div className="flex-1 h-3 bg-sts-bg rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full ${
-                hpCritical ? "bg-sts-red hp-critical" : "bg-sts-red"
-              }`}
-              style={{ width: `${hpPct}%` }}
-            />
-          </div>
-          <span className="text-xs font-mono text-sts-text-dim w-16 text-right">
-            {ps.current_hp}/{ps.max_hp}
-          </span>
-        </div>
-      )}
+      {/* Per-player stats */}
+      {point.player_stats.map((ps, pi) => {
+        const hpPct = ps.max_hp > 0 ? (ps.current_hp / ps.max_hp) * 100 : 0;
+        const hpCritical = hpPct < 25;
 
-      {/* Damage taken */}
-      {ps && ps.damage_taken > 0 && (
-        <span className="text-xs text-orange-400 font-mono">
-          -{ps.damage_taken}
-        </span>
-      )}
+        // Cards gained this floor
+        const cardsGained = ps.cards_gained?.map((c) => formatGameId(c.id)) || [];
+        const relicsGained =
+          ps.relic_choices
+            ?.filter((r) => r.was_picked)
+            .map((r) => formatGameId(r.choice)) || [];
+        const potionsGained =
+          ps.potion_choices
+            ?.filter((p) => p.was_picked)
+            .map((p) => formatGameId(p.choice)) || [];
 
-      {/* Gold */}
-      {ps && (
-        <span className="text-xs text-sts-gold font-mono w-12 text-right">
-          {ps.current_gold}g
-        </span>
-      )}
+        return (
+          <React.Fragment key={pi}>
+            {/* HP bar */}
+            <div className="flex items-center gap-2 w-40">
+              <div className="flex-1 h-3 bg-sts-bg rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${
+                    hpCritical ? "bg-sts-red hp-critical" : "bg-sts-red"
+                  }`}
+                  style={{ width: `${hpPct}%` }}
+                />
+              </div>
+              <span className="text-xs font-mono text-sts-text-dim w-16 text-right">
+                {ps.current_hp}/{ps.max_hp}
+              </span>
+            </div>
 
-      {/* Gains */}
-      <div className="flex-1 flex flex-wrap gap-1 ml-2">
-        {cardsGained.map((c, i) => (
-          <span
-            key={`card-${i}`}
-            className="px-1.5 py-0.5 bg-sts-card/50 rounded text-xs text-sts-gold-light"
-          >
-            {c}
-          </span>
-        ))}
-        {relicsGained.map((r, i) => (
-          <span
-            key={`relic-${i}`}
-            className="px-1.5 py-0.5 bg-amber-900/30 rounded text-xs text-sts-amber"
-          >
-            {r}
-          </span>
-        ))}
-        {potionsGained.map((p, i) => (
-          <span
-            key={`potion-${i}`}
-            className="px-1.5 py-0.5 bg-purple-900/30 rounded text-xs text-sts-purple"
-          >
-            {p}
-          </span>
-        ))}
-      </div>
+            {/* Damage taken */}
+            {ps.damage_taken > 0 && (
+              <span className="text-xs text-orange-400 font-mono">
+                -{ps.damage_taken}
+              </span>
+            )}
+
+            {/* Gold */}
+            <span className="text-xs text-sts-gold font-mono w-12 text-right">
+              {ps.current_gold}g
+            </span>
+
+            {/* Gains */}
+            <div className="flex-1 flex flex-wrap gap-1 ml-2">
+              {cardsGained.map((c, i) => (
+                <span
+                  key={`card-${pi}-${i}`}
+                  className="px-1.5 py-0.5 bg-sts-card/50 rounded text-xs text-sts-gold-light"
+                >
+                  {c}
+                </span>
+              ))}
+              {relicsGained.map((r, i) => (
+                <span
+                  key={`relic-${pi}-${i}`}
+                  className="px-1.5 py-0.5 bg-amber-900/30 rounded text-xs text-sts-amber"
+                >
+                  {r}
+                </span>
+              ))}
+              {potionsGained.map((p, i) => (
+                <span
+                  key={`potion-${pi}-${i}`}
+                  className="px-1.5 py-0.5 bg-purple-900/30 rounded text-xs text-sts-purple"
+                >
+                  {p}
+                </span>
+              ))}
+            </div>
+          </React.Fragment>
+        );
+      })}
     </div>
   );
 }
