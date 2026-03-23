@@ -204,14 +204,31 @@ public static class CombatTracker
             targetStats.DamageTaken += result.UnblockedDamage;
             targetStats.DamageBlocked += result.BlockedDamage;
 
-            // Track which enemy dealt the damage
-            if (dealer != null && dealer.IsEnemy)
+            // Per-turn damage taken
+            EnsureTurnEntry(targetStats);
+            targetStats.DamageTakenPerTurn[^1] += result.UnblockedDamage;
+            targetStats.DamageBlockedPerTurn[^1] += result.BlockedDamage;
+
+            // Per-source damage breakdown (both blocked and unblocked)
+            string sourceKey = dealer?.ModelId.ToString() ?? "_environmental";
+            if (!targetStats.DamageTakenBySource.ContainsKey(sourceKey))
+                targetStats.DamageTakenBySource[sourceKey] = new DamageTakenStats();
+            var srcStats = targetStats.DamageTakenBySource[sourceKey];
+            srcStats.Unblocked += result.UnblockedDamage;
+            srcStats.Blocked += result.BlockedDamage;
+            srcStats.Hits++;
+            if (result.UnblockedDamage > srcStats.MaxHit)
+                srcStats.MaxHit = result.UnblockedDamage;
+
+            // Log individual hit for granular analysis
+            targetStats.HitsReceived.Add(new HitReceivedEntry
             {
-                string sourceKey = dealer.ModelId.ToString();
-                if (!targetStats.DamageTakenBySource.ContainsKey(sourceKey))
-                    targetStats.DamageTakenBySource[sourceKey] = 0;
-                targetStats.DamageTakenBySource[sourceKey] += result.UnblockedDamage;
-            }
+                Source = sourceKey,
+                Unblocked = result.UnblockedDamage,
+                Blocked = result.BlockedDamage,
+                Turn = _turnNumber,
+                WasKilled = result.WasTargetKilled,
+            });
 
             // Flush after taking damage - this could be the killing blow
             FlushInProgress();
@@ -272,6 +289,10 @@ public static class CombatTracker
             stats.BlockPerTurn.Add(0);
         while (stats.CardsPerTurn.Count < _turnNumber)
             stats.CardsPerTurn.Add(0);
+        while (stats.DamageTakenPerTurn.Count < _turnNumber)
+            stats.DamageTakenPerTurn.Add(0);
+        while (stats.DamageBlockedPerTurn.Count < _turnNumber)
+            stats.DamageBlockedPerTurn.Add(0);
     }
 
     private static void WriteToDisk()
@@ -411,11 +432,20 @@ public class PlayerCombatStats
     [JsonPropertyName("damage_by_target")]
     public Dictionary<string, int> DamageByTarget { get; set; } = new();
 
+    [JsonPropertyName("damage_taken_per_turn")]
+    public List<int> DamageTakenPerTurn { get; set; } = new();
+
+    [JsonPropertyName("damage_blocked_per_turn")]
+    public List<int> DamageBlockedPerTurn { get; set; } = new();
+
     [JsonPropertyName("damage_by_card")]
     public Dictionary<string, CardDamageStats> DamageByCard { get; set; } = new();
 
     [JsonPropertyName("damage_taken_by_source")]
-    public Dictionary<string, int> DamageTakenBySource { get; set; } = new();
+    public Dictionary<string, DamageTakenStats> DamageTakenBySource { get; set; } = new();
+
+    [JsonPropertyName("hits_received")]
+    public List<HitReceivedEntry> HitsReceived { get; set; } = new();
 }
 
 public class CardDamageStats
@@ -431,6 +461,39 @@ public class CardDamageStats
 
     [JsonPropertyName("kills")]
     public int Kills { get; set; }
+}
+
+public class DamageTakenStats
+{
+    [JsonPropertyName("unblocked")]
+    public int Unblocked { get; set; }
+
+    [JsonPropertyName("blocked")]
+    public int Blocked { get; set; }
+
+    [JsonPropertyName("hits")]
+    public int Hits { get; set; }
+
+    [JsonPropertyName("max_hit")]
+    public int MaxHit { get; set; }
+}
+
+public class HitReceivedEntry
+{
+    [JsonPropertyName("source")]
+    public string Source { get; set; } = "";
+
+    [JsonPropertyName("unblocked")]
+    public int Unblocked { get; set; }
+
+    [JsonPropertyName("blocked")]
+    public int Blocked { get; set; }
+
+    [JsonPropertyName("turn")]
+    public int Turn { get; set; }
+
+    [JsonPropertyName("was_killed")]
+    public bool WasKilled { get; set; }
 }
 
 public class CardPlayEntry
