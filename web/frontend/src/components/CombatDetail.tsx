@@ -41,18 +41,18 @@ export default function CombatDetail({
           <span className="text-sts-text">
             {formatGameId(combat.encounter)}
           </span>
-          <span className="text-sts-text-dim text-sm">
+          <span className="text-sts-text text-sm">
             vs {combat.monsters.map(formatGameId).join(", ")}
           </span>
         </div>
         <div className="flex items-center gap-4 text-sm">
-          <span className="text-sts-text-dim">
+          <span className="text-sts-text">
             {combat.total_turns} turn{combat.total_turns !== 1 ? "s" : ""}
           </span>
           <span className={isInProgress ? "text-yellow-400 font-bold" : isWin ? "text-sts-green font-bold" : "text-sts-red font-bold"}>
             {isInProgress ? "IN PROGRESS" : isWin ? "WIN" : "LOSS"}
           </span>
-          <span className="text-sts-text-dim">
+          <span className="text-sts-text">
             {expanded ? "[-]" : "[+]"}
           </span>
         </div>
@@ -77,6 +77,16 @@ export default function CombatDetail({
             ))}
           </div>
 
+          {/* Combined per-turn chart */}
+          {playerEntries.some(([, s]) => s.damage_per_turn.length > 0) && (
+            <div className="bg-sts-card rounded-lg p-4">
+              <h5 className="text-sm font-semibold text-sts-text mb-2">
+                Per-Turn Breakdown
+              </h5>
+              <DamageChart players={combat.players} />
+            </div>
+          )}
+
           {/* Per-player detailed breakdowns */}
           {playerEntries.map(([pid, stats]) => (
             <div key={`detail-${pid}`} className="space-y-4">
@@ -84,25 +94,11 @@ export default function CombatDetail({
                 {formatGameId(stats.character)} - Detailed Breakdown
               </h4>
 
-              {/* Per-turn chart */}
-              {stats.damage_per_turn.length > 0 && (
-                <div className="bg-sts-card rounded-lg p-4">
-                  <h5 className="text-sm font-semibold text-sts-text-dim mb-2">
-                    Per-Turn Breakdown
-                  </h5>
-                  <DamageChart
-                    damagePerTurn={stats.damage_per_turn}
-                    blockPerTurn={stats.block_per_turn}
-                    cardsPerTurn={stats.cards_per_turn}
-                  />
-                </div>
-              )}
-
               {/* Card damage table */}
               {stats.damage_by_card &&
                 Object.keys(stats.damage_by_card).length > 0 && (
                   <div className="bg-sts-card rounded-lg p-4">
-                    <h5 className="text-sm font-semibold text-sts-text-dim mb-2">
+                    <h5 className="text-sm font-semibold text-sts-text mb-2">
                       Damage by Card
                     </h5>
                     <CardStats damageByCard={stats.damage_by_card} />
@@ -112,7 +108,7 @@ export default function CombatDetail({
               {/* Card sequence */}
               {stats.card_sequence.length > 0 && (
                 <div className="bg-sts-card rounded-lg p-4">
-                  <h5 className="text-sm font-semibold text-sts-text-dim mb-3">
+                  <h5 className="text-sm font-semibold text-sts-text mb-3">
                     Card Sequence
                   </h5>
                   <div className="flex flex-wrap gap-1.5">
@@ -128,7 +124,7 @@ export default function CombatDetail({
                               {i > 0 && (
                                 <div className="w-px h-6 bg-sts-border mx-2" />
                               )}
-                              <span className="text-xs text-sts-text-dim font-mono">
+                              <span className="text-xs text-sts-text font-mono">
                                 T{play.turn}
                               </span>
                             </div>

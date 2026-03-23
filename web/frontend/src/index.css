@@ -2,20 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom scrollbar for dark theme */
+body {
+  background-color: #132130;
+  color: #F2F0C4;
+}
+
+/* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #1a1a2e;
+  background: #132130;
 }
 ::-webkit-scrollbar-thumb {
-  background: #2a3a5c;
+  background: #2a5a6b;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3a4a6c;
+  background: #3a6a7b;
 }
 
 /* HP bar animation */

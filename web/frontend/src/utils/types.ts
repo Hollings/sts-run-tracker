@@ -242,6 +242,8 @@ export interface FloorPlayer {
   relics_picked: string[];
   potions_picked: string[];
   event_choices: string[];
+  rest_site_choices: string[];
+  upgraded_cards: string[];
 }
 
 export interface Floor {

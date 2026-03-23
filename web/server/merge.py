@@ -335,6 +335,36 @@ def merge_live_run(tracker: Optional[dict], save: Optional[dict]) -> dict:
     return result
 
 
+ROOM_TYPE_NAMES = {
+    "rest_site": "Rest Site",
+    "treasure": "Treasure",
+    "shop": "Shop",
+    "event": "Event",
+    "unknown": "Event",
+    "ancient": "Ancient",
+    "monster": "Monster",
+    "elite": "Elite",
+    "boss": "Boss",
+}
+
+
+def _parse_event_choice(key: str) -> str:
+    """Parse event localization key into readable name.
+    e.g. 'BUGSLAYER.pages.INITIAL.options.EXTERMINATION.title' -> 'Extermination'
+         'POMANDER.title' -> 'Pomander'
+    """
+    if not key:
+        return ""
+    parts = key.split(".")
+    # Pattern: EVENT.pages.PAGE.options.CHOICE.title
+    if "options" in parts:
+        idx = parts.index("options")
+        if idx + 1 < len(parts):
+            return parts[idx + 1].replace("_", " ").title()
+    # Fallback: use first part
+    return parts[0].replace("_", " ").title()
+
+
 def _build_floor(mp: dict, floor_num: int, act_idx: int) -> dict:
     """Build a floor entry from a map_point_history entry."""
     rooms = mp.get("rooms", [])
@@ -344,7 +374,7 @@ def _build_floor(mp: dict, floor_num: int, act_idx: int) -> dict:
         "floor": floor_num,
         "act": act_idx + 1,
         "type": mp.get("map_point_type", "unknown"),
-        "room_id": short_id(room.get("model_id", "")),
+        "room_id": short_id(room.get("model_id", "")) or ROOM_TYPE_NAMES.get(mp.get("map_point_type", ""), mp.get("map_point_type", "?")),
         "room_type": room.get("room_type", ""),
         "turns_taken": room.get("turns_taken", 0),
         "monsters": [short_id(m) for m in room.get("monster_ids", [])],
@@ -385,9 +415,19 @@ def _build_floor(mp: dict, floor_num: int, act_idx: int) -> dict:
             if pc.get("was_picked"):
                 player_floor["potions_picked"].append(short_id(pc.get("choice", "")))
 
-        # Event choices
+        # Event choices - parse localization keys into readable names
+        # e.g. "BUGSLAYER.pages.INITIAL.options.EXTERMINATION.title" -> "Extermination"
         player_floor["event_choices"] = [
-            ec.get("title", {}).get("key", "") for ec in ps.get("event_choices", [])
+            _parse_event_choice(ec.get("title", {}).get("key", ""))
+            for ec in ps.get("event_choices", [])
+        ]
+
+        # Rest site actions
+        player_floor["rest_site_choices"] = [
+            s.title() for s in ps.get("rest_site_choices", [])
+        ]
+        player_floor["upgraded_cards"] = [
+            short_id(c) for c in ps.get("upgraded_cards", [])
         ]
 
         floor["players"].append(player_floor)

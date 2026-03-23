@@ -44,7 +44,7 @@ export default function RunDetail() {
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="text-center text-sts-text-dim py-12">
+        <div className="text-center text-sts-text py-12">
           Loading run...
         </div>
       </div>
@@ -106,7 +106,7 @@ export default function RunDetail() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-sts-gold">{characters}</h1>
-            <p className="text-sm text-sts-text-dim mt-1">
+            <p className="text-sm text-sts-text mt-1">
               Seed: {run.seed} | {formatDate(run.start_time)} |{" "}
               {formatDuration(run.run_time)} | A{run.ascension} |{" "}
               {run.game_mode}
@@ -118,14 +118,14 @@ export default function RunDetail() {
                 VICTORY
               </span>
             ) : run.was_abandoned ? (
-              <span className="text-2xl font-bold text-sts-text-dim">
+              <span className="text-2xl font-bold text-sts-text">
                 ABANDONED
               </span>
             ) : (
               <div>
                 <span className="text-2xl font-bold text-sts-red">DEFEAT</span>
                 {killedBy && (
-                  <p className="text-sm text-sts-text-dim mt-1">
+                  <p className="text-sm text-sts-text mt-1">
                     Killed by: {killedBy}
                   </p>
                 )}
@@ -138,7 +138,7 @@ export default function RunDetail() {
       {/* HP chart */}
       {hpData.length > 0 && (
         <div className="bg-sts-surface border border-sts-border rounded-lg p-4 mb-6">
-          <h3 className="text-sm font-semibold text-sts-text-dim mb-3">
+          <h3 className="text-sm font-semibold text-sts-text mb-3">
             HP Over Run
           </h3>
           <div className="h-48">
@@ -250,7 +250,7 @@ export default function RunDetail() {
                     </span>
                   ))
                 ) : (
-                  <span className="text-xs text-sts-text-dim">No potions</span>
+                  <span className="text-xs text-sts-text">No potions</span>
                 )}
               </div>
             </div>
@@ -287,7 +287,7 @@ function FloorRow({
       )}`}
     >
       {/* Floor number */}
-      <span className="w-8 text-center text-sm font-mono text-sts-text-dim">
+      <span className="w-8 text-center text-sm font-mono text-sts-text">
         {floorNum}
       </span>
 
@@ -333,7 +333,7 @@ function FloorRow({
                   style={{ width: `${hpPct}%` }}
                 />
               </div>
-              <span className="text-xs font-mono text-sts-text-dim w-16 text-right">
+              <span className="text-xs font-mono text-sts-text w-16 text-right">
                 {ps.current_hp}/{ps.max_hp}
               </span>
             </div>

@@ -22,7 +22,7 @@ function StatBar({
   const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0;
   return (
     <div className="flex items-center gap-3 text-sm">
-      <span className="w-32 text-sts-text-dim">{label}</span>
+      <span className="w-32 text-sts-text">{label}</span>
       <span className="w-12 text-right font-mono font-semibold">{value}</span>
       <div className="flex-1 h-3 bg-sts-bg rounded-full overflow-hidden">
         <div
@@ -53,12 +53,12 @@ export default function PlayerCard({ playerId, stats, maxDamage }: Props) {
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-lg font-semibold text-sts-gold">
           {character}
-          <span className="text-sm text-sts-text-dim ml-2">
+          <span className="text-sm text-sts-text ml-2">
             (Player {playerId})
           </span>
         </h3>
         <div className="flex items-center gap-2 text-sm">
-          <span className="text-sts-text-dim">Kills:</span>
+          <span className="text-sts-text">Kills:</span>
           <span className="font-bold text-sts-red">{stats.kills}</span>
         </div>
       </div>
@@ -83,7 +83,7 @@ export default function PlayerCard({ playerId, stats, maxDamage }: Props) {
           color="bg-sts-blue"
         />
         <div className="flex items-center gap-3 text-sm">
-          <span className="w-32 text-sts-text-dim">Cards Played</span>
+          <span className="w-32 text-sts-text">Cards Played</span>
           <span className="w-12 text-right font-mono font-semibold">
             {stats.cards_played}
           </span>
@@ -93,7 +93,7 @@ export default function PlayerCard({ playerId, stats, maxDamage }: Props) {
       {/* Top cards by damage */}
       {cardDamageEntries.length > 0 && (
         <div className="mt-3 pt-3 border-t border-sts-border">
-          <h4 className="text-sm font-semibold text-sts-text-dim mb-2">
+          <h4 className="text-sm font-semibold text-sts-text mb-2">
             Top Cards
           </h4>
           <div className="space-y-1">
@@ -105,7 +105,7 @@ export default function PlayerCard({ playerId, stats, maxDamage }: Props) {
                 <span className="text-sts-gold-light">
                   {formatGameId(cardId)}
                 </span>
-                <span className="text-sts-text-dim font-mono">
+                <span className="text-sts-text font-mono">
                   {dmg.total_damage} dmg ({dmg.hits}x, max {dmg.max_hit})
                   {dmg.kills > 0 && (
                     <span className="text-sts-red ml-1">*</span>
@@ -114,7 +114,7 @@ export default function PlayerCard({ playerId, stats, maxDamage }: Props) {
               </div>
             ))}
             {cardDamageEntries.some(([, d]) => d.kills > 0) && (
-              <p className="text-xs text-sts-text-dim mt-1">
+              <p className="text-xs text-sts-text mt-1">
                 * = killing blow
               </p>
             )}
@@ -125,7 +125,7 @@ export default function PlayerCard({ playerId, stats, maxDamage }: Props) {
       {/* Damage by target */}
       {targetDamageEntries.length > 0 && (
         <div className="mt-3 pt-3 border-t border-sts-border">
-          <h4 className="text-sm font-semibold text-sts-text-dim mb-2">
+          <h4 className="text-sm font-semibold text-sts-text mb-2">
             Damage by Target
           </h4>
           <div className="space-y-1">

@@ -13,7 +13,7 @@ export default function CardStats({ damageByCard }: Props) {
 
   if (entries.length === 0) {
     return (
-      <div className="text-sts-text-dim text-sm text-center py-4">
+      <div className="text-sts-text text-sm text-center py-4">
         No card damage data available
       </div>
     );
@@ -25,7 +25,7 @@ export default function CardStats({ damageByCard }: Props) {
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-sts-border text-sts-text-dim text-left">
+          <tr className="border-b border-sts-border text-sts-text text-left">
             <th className="py-2 px-3 font-medium">Card</th>
             <th className="py-2 px-3 font-medium text-right">Total Damage</th>
             <th className="py-2 px-3 font-medium text-right">Hits</th>
@@ -53,12 +53,12 @@ export default function CardStats({ damageByCard }: Props) {
                 <td className="py-2 px-3 text-right font-mono">
                   {dmg.total_damage}
                 </td>
-                <td className="py-2 px-3 text-right font-mono text-sts-text-dim">
+                <td className="py-2 px-3 text-right font-mono text-sts-text">
                   {dmg.hits}
                 </td>
                 <td
                   className={`py-2 px-3 text-right font-mono ${
-                    isTopHit ? "text-sts-amber font-bold" : "text-sts-text-dim"
+                    isTopHit ? "text-sts-amber font-bold" : "text-sts-text"
                   }`}
                 >
                   {dmg.max_hit}
@@ -67,7 +67,7 @@ export default function CardStats({ damageByCard }: Props) {
                   {dmg.kills > 0 ? (
                     <span className="text-sts-red font-bold">{dmg.kills}</span>
                   ) : (
-                    <span className="text-sts-text-dim">0</span>
+                    <span className="text-sts-text">0</span>
                   )}
                 </td>
                 <td className="py-2 px-3">

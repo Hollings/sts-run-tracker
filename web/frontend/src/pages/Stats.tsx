@@ -46,7 +46,7 @@ export default function Stats() {
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="text-center text-sts-text-dim py-12">
+        <div className="text-center text-sts-text py-12">
           Loading stats...
         </div>
       </div>
@@ -110,7 +110,7 @@ function GlobalStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="bg-sts-surface border border-sts-border rounded-lg p-4 text-center">
       <div className="text-xl font-bold text-sts-gold">{value}</div>
-      <div className="text-xs text-sts-text-dim mt-1">{label}</div>
+      <div className="text-xs text-sts-text mt-1">{label}</div>
     </div>
   );
 }
@@ -153,7 +153,7 @@ function CharacterStatsSection({ stats }: { stats: CharacterStat[] }) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-sts-border bg-sts-card/50 text-sts-text-dim text-left">
+              <tr className="border-b border-sts-border bg-sts-card/50 text-sts-text text-left">
                 <th className="py-2 px-4 font-medium">Character</th>
                 <th className="py-2 px-4 font-medium text-right">W / L</th>
                 <th className="py-2 px-4 font-medium text-right">Win Rate</th>
@@ -177,7 +177,7 @@ function CharacterStatsSection({ stats }: { stats: CharacterStat[] }) {
                   </td>
                   <td className="py-2 px-4 text-right font-mono">
                     <span className="text-sts-green">{c.total_wins}</span>
-                    <span className="text-sts-text-dim"> / </span>
+                    <span className="text-sts-text"> / </span>
                     <span className="text-sts-red">{c.total_losses}</span>
                   </td>
                   <td className="py-2 px-4 text-right font-mono font-bold">
@@ -202,7 +202,7 @@ function CharacterStatsSection({ stats }: { stats: CharacterStat[] }) {
                   <td className="py-2 px-4 text-right font-mono">
                     {formatMinutes(c.fastest_win_time)}
                   </td>
-                  <td className="py-2 px-4 text-right font-mono text-sts-text-dim">
+                  <td className="py-2 px-4 text-right font-mono text-sts-text">
                     {formatHours(c.playtime)}
                   </td>
                 </tr>
@@ -265,7 +265,7 @@ function CardStatsSection({ stats }: { stats: CardStat[] }) {
         </h2>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <label className="text-xs text-sts-text-dim whitespace-nowrap">
+            <label className="text-xs text-sts-text whitespace-nowrap">
               Min Offers:
             </label>
             <input
@@ -282,7 +282,7 @@ function CardStatsSection({ stats }: { stats: CardStat[] }) {
               className={`px-3 py-1 rounded text-xs font-medium ${
                 sortBy === "picked"
                   ? "bg-sts-gold text-sts-bg"
-                  : "bg-sts-card text-sts-text-dim hover:text-sts-text"
+                  : "bg-sts-card text-sts-text hover:text-sts-text"
               }`}
               onClick={() => setSortBy("picked")}
             >
@@ -292,7 +292,7 @@ function CardStatsSection({ stats }: { stats: CardStat[] }) {
               className={`px-3 py-1 rounded text-xs font-medium ${
                 sortBy === "pickRate"
                   ? "bg-sts-gold text-sts-bg"
-                  : "bg-sts-card text-sts-text-dim hover:text-sts-text"
+                  : "bg-sts-card text-sts-text hover:text-sts-text"
               }`}
               onClick={() => setSortBy("pickRate")}
             >
@@ -302,7 +302,7 @@ function CardStatsSection({ stats }: { stats: CardStat[] }) {
               className={`px-3 py-1 rounded text-xs font-medium ${
                 sortBy === "winRate"
                   ? "bg-sts-gold text-sts-bg"
-                  : "bg-sts-card text-sts-text-dim hover:text-sts-text"
+                  : "bg-sts-card text-sts-text hover:text-sts-text"
               }`}
               onClick={() => setSortBy("winRate")}
             >
@@ -315,7 +315,7 @@ function CardStatsSection({ stats }: { stats: CardStat[] }) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-sts-border bg-sts-card/50 text-sts-text-dim text-left">
+              <tr className="border-b border-sts-border bg-sts-card/50 text-sts-text text-left">
                 <th className="py-2 px-4 font-medium">Card</th>
                 <th className="py-2 px-4 font-medium text-right">Picked</th>
                 <th className="py-2 px-4 font-medium text-right">Skipped</th>
@@ -337,7 +337,7 @@ function CardStatsSection({ stats }: { stats: CardStat[] }) {
                   <td className="py-2 px-4 text-right font-mono">
                     {card.times_picked}
                   </td>
-                  <td className="py-2 px-4 text-right font-mono text-sts-text-dim">
+                  <td className="py-2 px-4 text-right font-mono text-sts-text">
                     {card.times_skipped}
                   </td>
                   <td className="py-2 px-4 text-right font-mono">

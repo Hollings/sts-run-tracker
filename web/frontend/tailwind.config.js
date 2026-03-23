@@ -5,20 +5,26 @@ export default {
     extend: {
       colors: {
         sts: {
-          bg: "#1a1a2e",
-          surface: "#16213e",
-          card: "#1e2d4a",
-          border: "#2a3a5c",
-          gold: "#d4a843",
-          "gold-light": "#f0d68a",
-          "gold-dim": "#8a6d2b",
-          amber: "#f59e0b",
-          red: "#ef4444",
-          green: "#22c55e",
-          blue: "#3b82f6",
-          purple: "#a855f7",
-          text: "#e2e8f0",
-          "text-dim": "#94a3b8",
+          bg: "#132130",
+          surface: "#183749",
+          card: "#1e4259",
+          border: "#2a5a6b",
+          // Primary palette
+          gold: "#F2F0C4",
+          "gold-light": "#F8F6DC",
+          "gold-dim": "#776754",
+          amber: "#F2F0C4",
+          red: "#8B1913",
+          green: "#5aba7c",
+          blue: "#6aaacc",
+          purple: "#b09ac0",
+          // Text
+          text: "#F2F0C4",
+          "text-dim": "#b8a88a",
+          "text-muted": "#8a9aa2",
+          // Accents
+          slate: "#54626B",
+          metallic: "#6A4F4C",
         },
       },
       fontFamily: {

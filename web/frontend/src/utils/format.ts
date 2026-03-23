@@ -66,7 +66,7 @@ export function roomTypeColor(roomType: string): string {
     case "unknown":
       return "text-blue-400";
     default:
-      return "text-sts-text-dim";
+      return "text-sts-text";
   }
 }
 

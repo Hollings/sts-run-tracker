@@ -92,7 +92,7 @@ export default function RunHistory() {
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="text-center text-sts-text-dim py-12">Loading runs...</div>
+        <div className="text-center text-sts-text py-12">Loading runs...</div>
       </div>
     );
   }
@@ -112,7 +112,7 @@ export default function RunHistory() {
       {/* Filters */}
       <div className="bg-sts-surface border border-sts-border rounded-lg p-4 mb-6 flex flex-wrap gap-4">
         <div>
-          <label className="block text-xs text-sts-text-dim mb-1">
+          <label className="block text-xs text-sts-text mb-1">
             Character
           </label>
           <select
@@ -129,7 +129,7 @@ export default function RunHistory() {
           </select>
         </div>
         <div>
-          <label className="block text-xs text-sts-text-dim mb-1">
+          <label className="block text-xs text-sts-text mb-1">
             Result
           </label>
           <select
@@ -144,7 +144,7 @@ export default function RunHistory() {
           </select>
         </div>
         <div>
-          <label className="block text-xs text-sts-text-dim mb-1">
+          <label className="block text-xs text-sts-text mb-1">
             Ascension
           </label>
           <select
@@ -160,7 +160,7 @@ export default function RunHistory() {
             ))}
           </select>
         </div>
-        <div className="ml-auto self-end text-sm text-sts-text-dim">
+        <div className="ml-auto self-end text-sm text-sts-text">
           {filteredRuns.length} of {runs.length} runs
         </div>
       </div>
@@ -170,7 +170,7 @@ export default function RunHistory() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-sts-border bg-sts-card/50 text-sts-text-dim text-left">
+              <tr className="border-b border-sts-border bg-sts-card/50 text-sts-text text-left">
                 <th
                   className="py-3 px-4 font-medium cursor-pointer hover:text-sts-text"
                   onClick={() => toggleSort("start_time")}
@@ -206,7 +206,7 @@ export default function RunHistory() {
                 const resultColor = run.win
                   ? "text-sts-green"
                   : run.was_abandoned
-                  ? "text-sts-text-dim"
+                  ? "text-sts-text"
                   : "text-sts-red";
                 const resultText = run.win
                   ? "W"
@@ -235,16 +235,16 @@ export default function RunHistory() {
                     <td className={`py-2.5 px-4 font-bold ${resultColor}`}>
                       {resultText}
                     </td>
-                    <td className="py-2.5 px-4 font-mono text-sts-text-dim">
+                    <td className="py-2.5 px-4 font-mono text-sts-text">
                       {formatDuration(run.run_time)}
                     </td>
-                    <td className="py-2.5 px-4 font-mono text-sts-text-dim">
+                    <td className="py-2.5 px-4 font-mono text-sts-text">
                       {run.seed}
                     </td>
                     <td className="py-2.5 px-4 font-mono">
                       {run.floor_count}
                     </td>
-                    <td className="py-2.5 px-4 text-sts-text-dim">
+                    <td className="py-2.5 px-4 text-sts-text">
                       {run.win ? "" : formatGameId(run.killed_by)}
                     </td>
                   </tr>
@@ -254,7 +254,7 @@ export default function RunHistory() {
                 <tr>
                   <td
                     colSpan={8}
-                    className="py-8 text-center text-sts-text-dim"
+                    className="py-8 text-center text-sts-text"
                   >
                     No runs match your filters
                   </td>

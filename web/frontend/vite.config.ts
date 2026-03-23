@@ -6,6 +6,13 @@ export default defineConfig({
   server: {
     port: 3000,
     host: true,
+    headers: {
+      "Cache-Control": "no-store",
+    },
+    watch: {
+      // Ensure tailwind config changes trigger rebuild
+      ignored: ["!**/tailwind.config.*"],
+    },
     proxy: {
       "/api": {
         target: "http://127.0.0.1:8000",
