@@ -129,12 +129,14 @@ public static class CombatTracker
 
         _current.TotalTurns = _turnNumber;
 
+        // Find in-progress entry BEFORE changing result (same object reference)
+        int existingIdx = _combats.FindIndex(c => c.Encounter == _current.Encounter && c.Floor == _current.Floor && c.Result == "in_progress");
+
         // Determine result
         bool victory = combatState?.Enemies.All(e => !e.IsAlive) ?? false;
         _current.Result = victory ? "win" : "loss";
 
         // Replace in-progress entry if we had one, otherwise add
-        int existingIdx = _combats.FindIndex(c => c.Encounter == _current.Encounter && c.Floor == _current.Floor && c.Result == "in_progress");
         if (existingIdx >= 0)
             _combats[existingIdx] = _current;
         else

@@ -105,12 +105,19 @@ def load_tracker(path: str) -> Optional[dict]:
 # --- Game save data ---
 
 def load_current_or_latest_run() -> Optional[dict]:
-    """Load active run, or fall back to the most recent completed run."""
+    """Load active run, or fall back to the most recent completed run.
+    Prefers the most recently modified save between current_run.save and
+    current_run_mp.save (multiplayer uses a separate file)."""
     save_dir = get_save_profile_dir()
-    # Try active run first
-    current = os.path.join(save_dir, "current_run.save")
-    if os.path.exists(current):
-        return load_json(current)
+    # Check both singleplayer and multiplayer save files, prefer most recent
+    candidates = []
+    for name in ("current_run.save", "current_run_mp.save"):
+        path = os.path.join(save_dir, name)
+        if os.path.exists(path):
+            candidates.append(path)
+    if candidates:
+        best = max(candidates, key=os.path.getmtime)
+        return load_json(best)
     # No active run - load the latest completed run from history
     history_dir = os.path.join(save_dir, "history")
     if os.path.isdir(history_dir):
