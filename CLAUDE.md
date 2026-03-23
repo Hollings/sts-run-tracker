@@ -75,8 +75,10 @@ React 19 + TypeScript + Vite + Tailwind CSS + recharts. Dark theme with amber/go
 
 ### Key Data Paths (Windows)
 - Mod output: `%APPDATA%\SlayTheSpire2\tracker\<seed>_<timestamp>.json`
-- Modded saves: `Steam\userdata\<uid>\2868840\remote\modded\profile1\saves\`
-- Unmodded saves: `Steam\userdata\<uid>\2868840\remote\profile1\saves\`
+- **Primary saves (game reads/writes here):** `%APPDATA%\SlayTheSpire2\steam\<steam64id>\`
+  - Modded: `.../modded/profile1/saves/`
+  - Unmodded: `.../profile1/saves/`
+- Cloud sync copy (NOT what the game reads): `Steam\userdata\<steam32id>\2868840\remote\`
 - Multiplayer save: `current_run_mp.save` (separate from singleplayer `current_run.save`)
 - Game logs: `%APPDATA%\SlayTheSpire2\logs\godot.log`
 - Game install: `C:\Program Files (x86)\Steam\steamapps\common\Slay the Spire 2\`

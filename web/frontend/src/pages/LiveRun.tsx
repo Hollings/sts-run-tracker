@@ -252,10 +252,11 @@ export default function LiveRun({ data }: Props) {
           <h3 className="text-lg font-semibold text-sts-text mb-2">
             Floors
           </h3>
-          {floors.map((floor) => (
+          {[...floors].reverse().map((floor, i) => (
             <FloorCard
               key={floor.floor}
               floor={floor}
+              isLive={i === 0}
               expanded={expandedFloor === floor.floor}
               onToggle={() =>
                 setExpandedFloor(
@@ -269,94 +270,72 @@ export default function LiveRun({ data }: Props) {
         {/* Run totals sidebar */}
         <div className="lg:w-80 space-y-4">
           <div className="bg-sts-surface border border-sts-border rounded-lg p-4 lg:sticky lg:top-20">
-            <h3 className="text-lg font-semibold text-sts-gold mb-4">
+            <h3 className="text-lg font-semibold text-sts-gold mb-3">
               Run Totals
             </h3>
 
-            {playerEntries.length === 0 && (
+            {playerEntries.length === 0 ? (
               <p className="text-sm text-sts-text-dim">
                 No combat data yet.
               </p>
-            )}
-
-            {playerEntries.map(([pid, pt]) => (
-              <div key={pid} className="mb-5 last:mb-0">
-                <h4 className="text-sm font-semibold text-sts-gold-light mb-2">
-                  {formatGameId(pt.character)}
-                </h4>
-                <div className="space-y-1.5 text-sm">
-                  <TotalRow
-                    label="Damage Dealt"
-                    value={pt.damage_dealt}
-                    color="text-sts-red"
-                  />
-                  <TotalRow
-                    label="Damage Taken"
-                    value={pt.damage_taken}
-                    color="text-orange-400"
-                  />
-                  <TotalRow
-                    label="Block Gained"
-                    value={pt.block_gained}
-                    color="text-sts-blue"
-                  />
-                  <TotalRow
-                    label="Cards Played"
-                    value={pt.cards_played}
-                  />
-                  <TotalRow
-                    label="Kills"
-                    value={pt.kills}
-                    color="text-sts-red"
-                  />
-                  <TotalRow
-                    label="Combats"
-                    value={pt.combats}
-                  />
-
-                  {/* Best Hit - shown prominently */}
-                  {pt.best_hit && pt.best_hit.damage > 0 && (
-                    <BestHitDisplay bestHit={pt.best_hit} />
-                  )}
+            ) : (
+              <>
+                {/* Run summary */}
+                <div className="flex justify-between text-sm mb-4 pb-3 border-b border-sts-border/50">
+                  <span className="text-sts-text-dim">
+                    {run_totals?.total_combats ?? 0} combats
+                  </span>
+                  <span>
+                    <span className="text-sts-green font-semibold">{run_totals?.wins ?? 0}W</span>
+                    {(run_totals?.losses ?? 0) > 0 && (
+                      <span className="text-sts-red font-semibold ml-2">{run_totals.losses}L</span>
+                    )}
+                  </span>
                 </div>
-              </div>
-            ))}
+
+                {/* Per-player compact cards */}
+                {playerEntries.map(([pid, pt]) => (
+                  <div key={pid} className="mb-3 last:mb-0 bg-sts-card rounded-lg p-3 border border-sts-border/30">
+                    <h4 className="text-sm font-semibold text-sts-gold-light mb-2">
+                      {formatGameId(pt.character)}
+                    </h4>
+
+                    {/* Stat grid */}
+                    <div className="grid grid-cols-3 gap-x-3 gap-y-1 text-xs mb-2">
+                      <div>
+                        <div className="text-sts-red font-bold text-base">{pt.damage_dealt}</div>
+                        <div className="text-sts-text-dim">Dealt</div>
+                      </div>
+                      <div>
+                        <div className="text-orange-400 font-bold text-base">{pt.damage_taken}</div>
+                        <div className="text-sts-text-dim">Taken</div>
+                      </div>
+                      <div>
+                        <div className="text-sts-blue font-bold text-base">{pt.block_gained}</div>
+                        <div className="text-sts-text-dim">Block</div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 text-xs text-sts-text-dim">
+                      <span>{pt.cards_played} cards</span>
+                      <span>{pt.kills} kills</span>
+                    </div>
+
+                    {/* Best hit inline */}
+                    {pt.best_hit && pt.best_hit.damage > 0 && (
+                      <div className="mt-2 pt-2 border-t border-sts-border/30 text-xs">
+                        <span className="text-sts-text-dim">Best hit: </span>
+                        <span className="text-sts-amber font-bold">{pt.best_hit.damage}</span>
+                        <span className="text-sts-text-dim"> with </span>
+                        <span className="text-sts-gold-light">{pt.best_hit.card}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Best Hit display
-// ---------------------------------------------------------------------------
-
-function BestHitDisplay({
-  bestHit,
-}: {
-  bestHit: { card: string; damage: number; encounter: string };
-}) {
-  return (
-    <div className="mt-3 pt-3 border-t border-sts-border/50">
-      <div className="text-xs text-sts-text-dim uppercase tracking-wide mb-1">
-        Best Single Hit
-      </div>
-      <div className="flex items-baseline gap-2">
-        <span className="text-2xl font-black text-sts-amber">
-          {bestHit.damage}
-        </span>
-        <span className="text-sm text-sts-text-dim">dmg</span>
-      </div>
-      <div className="text-sm mt-0.5">
-        <span className="text-sts-gold-light font-medium">
-          {bestHit.card}
-        </span>
-        {bestHit.encounter && (
-          <span className="text-sts-text-dim ml-1">
-            vs {bestHit.encounter}
-          </span>
-        )}
       </div>
     </div>
   );
@@ -385,10 +364,12 @@ function ChevronDown({ className }: { className?: string }) {
 
 function FloorCard({
   floor,
+  isLive,
   expanded,
   onToggle,
 }: {
   floor: Floor;
+  isLive: boolean;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -398,9 +379,11 @@ function FloorCard({
 
   return (
     <div
-      className={`border rounded-lg overflow-hidden ${floorTypeBorderColor(
-        floor.type
-      )} bg-sts-surface`}
+      className={`border rounded-lg overflow-hidden ${
+        isLive
+          ? "border-yellow-500/80 ring-1 ring-yellow-500/30"
+          : floorTypeBorderColor(floor.type)
+      } bg-sts-surface`}
     >
       {/* Header - always visible */}
       <div className="px-4 py-3 flex items-center justify-between text-left">
@@ -421,6 +404,11 @@ function FloorCard({
               <span className="font-semibold text-sts-gold">
                 Floor {floor.floor}
               </span>
+              {isLive && (
+                <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-yellow-500/20 text-yellow-400 rounded">
+                  Live
+                </span>
+              )}
               <span className={`text-xs font-medium ${floorTypeTextColor(floor.type)}`}>
                 {typeLabel}
               </span>
@@ -673,21 +661,3 @@ function StatBox({
   );
 }
 
-function TotalRow({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: number;
-  color?: string;
-}) {
-  return (
-    <div className="flex justify-between">
-      <span className="text-sts-text-dim">{label}</span>
-      <span className={`font-mono font-semibold ${color || "text-sts-text"}`}>
-        {value}
-      </span>
-    </div>
-  );
-}

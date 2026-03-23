@@ -23,28 +23,46 @@ TRACKER_DIR = os.environ.get(
     os.path.join(os.environ.get("APPDATA", ""), "SlayTheSpire2", "tracker")
 )
 def _discover_save_dir() -> str:
-    """Auto-discover the Steam save directory for StS2."""
+    """Auto-discover the save directory for StS2.
+
+    The game stores saves in two places:
+    1. %APPDATA%/SlayTheSpire2/steam/<steam64id>/ (primary - game reads/writes here)
+    2. Steam/userdata/<steam32id>/2868840/remote/ (cloud sync copy)
+    We prefer #1 since that's what the game actually uses.
+    """
     env_override = os.environ.get("STS2_SAVE_DIR")
     if env_override:
         return env_override
+    # Primary: %APPDATA%/SlayTheSpire2/steam/<steam64id>/
+    appdata_base = os.path.join(
+        os.environ.get("APPDATA", ""), "SlayTheSpire2", "steam"
+    )
+    if os.path.isdir(appdata_base):
+        candidates = []
+        for steam_id in os.listdir(appdata_base):
+            steam_dir = os.path.join(appdata_base, steam_id)
+            if os.path.isdir(steam_dir):
+                candidates.append(steam_dir)
+        if candidates:
+            if len(candidates) == 1:
+                return candidates[0]
+            return max(candidates, key=lambda d: os.path.getmtime(d))
+    # Fallback: Steam userdata (cloud sync copy)
     steam_base = os.path.join(
         os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"),
         "Steam", "userdata"
     )
     if os.path.isdir(steam_base):
-        # Scan all Steam user directories for StS2 app data (2868840)
         candidates = []
         for user_id in os.listdir(steam_base):
             remote_dir = os.path.join(steam_base, user_id, "2868840", "remote")
             if os.path.isdir(remote_dir):
                 candidates.append(remote_dir)
         if candidates:
-            # Prefer the one with the most recent save data
             if len(candidates) == 1:
                 return candidates[0]
             return max(candidates, key=lambda d: os.path.getmtime(d))
-    # Fallback
-    return os.path.join(steam_base, "unknown", "2868840", "remote")
+    return os.path.join(appdata_base, "unknown")
 
 
 SAVE_DIR = _discover_save_dir()
@@ -205,6 +223,8 @@ def merge_live_run(tracker: Optional[dict], save: Optional[dict]) -> dict:
         "run_totals": {},
     }
 
+    matched_combats: set[int] = set()
+
     # Run info from tracker
     if tracker:
         result["run_info"] = tracker.get("run_info", {})
@@ -226,7 +246,6 @@ def merge_live_run(tracker: Optional[dict], save: Optional[dict]) -> dict:
             }
 
         floor_num = 0
-        matched_combats: set[int] = set()
         for act_idx, act in enumerate(save.get("map_point_history", [])):
             if not isinstance(act, list):
                 continue
@@ -257,6 +276,57 @@ def merge_live_run(tracker: Optional[dict], save: Optional[dict]) -> dict:
                                 break
 
                 result["floors"].append(floor)
+
+    # Inject synthetic floors for tracker combats on floors the save file
+    # hasn't recorded yet (e.g. in-progress combat)
+    if tracker:
+        existing_floors = {f["floor"] for f in result["floors"]}
+        seen_synthetic = set()
+        for combat in tracker.get("combats", []):
+            combat_floor = combat.get("floor", 0)
+            if combat_floor in existing_floors or combat_floor in seen_synthetic:
+                continue
+            seen_synthetic.add(combat_floor)
+            # Build a minimal floor from tracker combat data
+            floor_num = combat.get("floor", len(result["floors"]) + 1)
+            encounter = combat.get("encounter", "")
+            # Determine floor type from encounter name heuristics
+            enc_lower = encounter.lower()
+            if "boss" in enc_lower:
+                floor_type = "boss"
+            elif "elite" in enc_lower:
+                floor_type = "elite"
+            else:
+                floor_type = "monster"
+            synthetic = {
+                "floor": floor_num,
+                "act": (result["floors"][-1]["act"] if result["floors"] else 1),
+                "type": floor_type,
+                "room_id": short_id(encounter),
+                "room_type": floor_type,
+                "turns_taken": combat.get("total_turns", 0),
+                "monsters": [short_id(m) for m in combat.get("monsters", [])],
+                "players": [
+                    {
+                        "player_id": pid,
+                        "hp": 0,
+                        "max_hp": 0,
+                        "damage_taken": stats.get("damage_taken", 0),
+                        "hp_healed": 0,
+                        "gold": 0,
+                        "gold_gained": 0,
+                        "gold_spent": 0,
+                        "cards_picked": [],
+                        "cards_skipped": [],
+                        "relics_picked": [],
+                        "potions_picked": [],
+                        "event_choices": [],
+                    }
+                    for pid, stats in combat.get("players", {}).items()
+                ],
+                "combat": combat,
+            }
+            result["floors"].append(synthetic)
 
     # Compute run totals from tracker combats
     if result["combats"]:
