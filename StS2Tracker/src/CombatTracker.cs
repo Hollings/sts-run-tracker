@@ -114,18 +114,22 @@ public static class CombatTracker
         bool victory = combatState?.Enemies.All(e => !e.IsAlive) ?? false;
         _current.Result = victory ? "win" : "loss";
 
-        _combats.Add(_current);
+        // Replace in-progress entry if we had one, otherwise add
+        int existingIdx = _combats.FindIndex(c => c.Encounter == _current.Encounter && c.Result == "in_progress");
+        if (existingIdx >= 0)
+            _combats[existingIdx] = _current;
+        else
+            _combats.Add(_current);
+
         ModEntry.Log($"Combat ended: {_current.Encounter} = {_current.Result} " +
                      $"({_current.TotalTurns} turns, {_current.Players.Count} players)");
 
-        // Log summary per player
         foreach (var (pid, stats) in _current.Players)
         {
             ModEntry.Log($"  Player {pid}: dealt={stats.DamageDealt} taken={stats.DamageTaken} " +
                          $"block={stats.BlockGained} cards={stats.CardsPlayed}");
         }
 
-        // Write after each combat for safety
         WriteToDisk();
         _current = null;
     }
@@ -133,6 +137,28 @@ public static class CombatTracker
     public static void OnTurnStart(Player player)
     {
         _turnNumber++;
+        FlushInProgress();
+    }
+
+    /// <summary>
+    /// Write in-progress combat to disk so data is preserved even if the player dies.
+    /// The in-progress entry gets replaced on next flush or finalized on combat end.
+    /// </summary>
+    private static void FlushInProgress()
+    {
+        if (_current == null) return;
+
+        _current.TotalTurns = _turnNumber;
+        _current.Result = "in_progress";
+
+        // Add or update the in-progress entry
+        int existingIdx = _combats.FindIndex(c => c.Encounter == _current.Encounter && c.Result == "in_progress");
+        if (existingIdx >= 0)
+            _combats[existingIdx] = _current;
+        else
+            _combats.Add(_current);
+
+        WriteToDisk();
     }
 
     public static void OnDamageGiven(Creature? dealer, DamageResult result, Creature target, CardModel? cardSource)
