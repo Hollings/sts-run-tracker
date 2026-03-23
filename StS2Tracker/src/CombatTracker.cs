@@ -203,6 +203,18 @@ public static class CombatTracker
         {
             targetStats.DamageTaken += result.UnblockedDamage;
             targetStats.DamageBlocked += result.BlockedDamage;
+
+            // Track which enemy dealt the damage
+            if (dealer != null && dealer.IsEnemy)
+            {
+                string sourceKey = dealer.ModelId.ToString();
+                if (!targetStats.DamageTakenBySource.ContainsKey(sourceKey))
+                    targetStats.DamageTakenBySource[sourceKey] = 0;
+                targetStats.DamageTakenBySource[sourceKey] += result.UnblockedDamage;
+            }
+
+            // Flush after taking damage - this could be the killing blow
+            FlushInProgress();
         }
     }
 
@@ -401,6 +413,9 @@ public class PlayerCombatStats
 
     [JsonPropertyName("damage_by_card")]
     public Dictionary<string, CardDamageStats> DamageByCard { get; set; } = new();
+
+    [JsonPropertyName("damage_taken_by_source")]
+    public Dictionary<string, int> DamageTakenBySource { get; set; } = new();
 }
 
 public class CardDamageStats
