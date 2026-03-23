@@ -305,8 +305,46 @@ GET  /runs/<run_id>             # rendered run page (shareable link)
 16. Build run page template
 17. Multiplayer end-to-end test
 
-### Phase 3+ (Polish)
+### Phase 3 (Privacy, Upload Settings, Community)
+
+#### Mod Settings UI (in-game or config file)
+
+**Upload scope:**
+- All Historical Data / New Data Only (retroactively upload existing runs or start fresh)
+- Multiplayer Only / Single + Multi (some players may only want to share MP data)
+- Fully Anonymized mode (strip Steam IDs, replace with random hashes per run)
+
+**Visibility:**
+- Public (anyone with link can see)
+- Friends Only (only Steam friends can view)
+- Private (only you, via authenticated dashboard)
+
+#### Steam Friends-Only Visibility
+
+Requires Steam Web API integration on the backend:
+- Player authenticates via Steam OpenID on the web dashboard
+- Backend calls Steam `GetFriendList` API to check if viewer is friends with
+  the run owner
+- Run pages return 403 if not friends
+- The mod itself doesn't need to do auth - it just tags runs with the player's
+  Steam ID. Auth happens server-side when someone tries to view.
+- Steam Web API key required on the server (free from Steamworks partner site)
+- Not super hard, but adds a real auth layer. Could start with "public or
+  private" toggle and add friends-only later.
+
+#### Community Aggregate Stats
+
+With enough uploaded data, the service can show:
+- Global card pick rates and win rates (across all players)
+- Encounter difficulty rankings from real combat data (damage taken, turns)
+- Character win rates by ascension level
+- Popular deck archetypes / card combinations
+- "How does your run compare to average?"
+- Best single hits across all players (leaderboard)
+
+All aggregate stats can use anonymized data - no need for player identity.
+
+### Phase 4+ (Polish)
 18. In-game overlay / post-combat stats
 19. Steam Workshop packaging
-20. Community aggregate stats
-21. Card tooltip enhancements
+20. Card tooltip enhancements
