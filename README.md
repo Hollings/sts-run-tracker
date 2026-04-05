@@ -1,47 +1,24 @@
 # StS2 Run Tracker
 
-A Slay the Spire 2 mod + web dashboard that captures detailed per-player combat stats (damage dealt, block, cards played, kills) and displays them in a live browser dashboard alongside game save data.
+A Slay the Spire 2 mod that captures detailed per-player combat stats (damage dealt, block, cards played, kills) and displays them in a live browser dashboard. The dashboard is built into the mod -- no separate server or setup required.
 
-## Components
+## Install
 
-- **C# Harmony mod** hooks into combat events, writes JSON to disk
-- **FastAPI backend** merges mod output with game save files, serves REST + WebSocket
-- **React frontend** live dashboard with run history, per-floor detail, and lifetime stats
-
-## Install the mod
-
-1. Build or download `StS2Tracker.dll` and copy it with the manifest into the game's mods directory:
+1. Download the latest release and place all files in the game's mods directory:
    ```
    <game>/mods/StS2Tracker/
        StS2Tracker.json
        StS2Tracker.dll
+       web/              <- built dashboard files
+           index.html
+           assets/
    ```
 
 2. Launch Slay the Spire 2. First launch with a new mod shows a confirmation popup -- accept it, the game quits, then relaunch.
 
-3. On the second launch the mod loads automatically. `[StS2Tracker]` messages in the game log confirm it's running.
+3. Open `http://localhost:52323` in your browser to view the dashboard.
 
-## Run the web dashboard
-
-### Backend
-
-```bash
-pip install fastapi uvicorn watchfiles websockets pydantic
-cd web/server
-python -m uvicorn main:app --host 0.0.0.0 --port 8000
-```
-
-Do **not** use `--reload` -- it spawns zombie child processes on Windows.
-
-### Frontend
-
-```bash
-cd web/frontend
-npm install
-npm run dev
-```
-
-Open `http://localhost:3000` in your browser. The navbar shows the dashboard URL so you can share it with co-op partners on your network.
+On the second launch the mod loads automatically. `[StS2Tracker]` messages in the game log confirm it's running.
 
 ## Save files
 
@@ -102,9 +79,9 @@ Tracker JSON is written to:
 %APPDATA%\SlayTheSpire2\tracker\<seed>_<timestamp>.json
 ```
 
-The backend auto-discovers save files from `%APPDATA%\SlayTheSpire2\steam\` and merges them with tracker data.
+## Building from source
 
-## Building the mod from source
+### C# mod
 
 Requires .NET 9 SDK.
 
@@ -113,6 +90,39 @@ dotnet build -p:STS2GameDir="<path to Slay the Spire 2>" StS2Tracker/
 ```
 
 Copy `StS2Tracker/bin/StS2Tracker.dll` to `<game>/mods/StS2Tracker/`.
+
+### Frontend
+
+```bash
+cd web/frontend && npm install && npm run build
+```
+
+Copy the contents of `web/frontend/dist/` to `<game>/mods/StS2Tracker/web/`.
+
+## Development
+
+The Python backend and React dev server in `web/` are still available for development:
+
+### Backend (for development only)
+```bash
+pip install fastapi uvicorn watchfiles websockets pydantic
+cd web/server && python -m uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+Do **not** use `--reload` -- it spawns zombie child processes on Windows.
+
+### Frontend (for development only)
+```bash
+cd web/frontend && npm install && npm run dev
+```
+
+Runs on port 3000. Vite proxies `/api` and `/ws` to backend on port 8000.
+
+To rebuild the frontend for production:
+```bash
+cd web/frontend && npm run build
+```
+Then copy `dist/` contents to `<game>/mods/StS2Tracker/web/`.
 
 ## CLI tools
 
@@ -135,7 +145,7 @@ slaythespiredata/
             CombatTracker.cs  # data collection + JSON export
             HarmonyPatches.cs # Harmony hooks into game events
     web/
-        server/               # FastAPI backend
+        server/               # FastAPI backend (development only)
             main.py           # REST + WebSocket endpoints
             merge.py          # tracker + save file merge logic
             watcher.py        # file watcher for live updates
@@ -149,3 +159,8 @@ slaythespiredata/
     DESIGN.md                 # project roadmap
     HOOKS_REFERENCE.md        # decompiled game API reference
 ```
+
+## Known issues
+
+- The mod DLL is locked while the game is running. Close the game before deploying a new build.
+- Large chunk size warning during frontend build (recharts library). Does not affect functionality.
