@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-A Slay the Spire 2 run tracker: a C# Harmony mod that hooks into combat events to capture per-player damage/block/card data, a FastAPI backend that merges mod output with game save files, and a React frontend dashboard.
+A Slay the Spire 2 run tracker: a C# Harmony mod that hooks into combat events to capture per-player damage/block/card data, embeds an HTTP server serving a React dashboard, and optionally uses a FastAPI backend for development. In production, the mod serves the dashboard directly at `http://localhost:52323` with no external dependencies.
 
 ## Build & Run Commands
 
@@ -18,14 +18,24 @@ cp StS2Tracker/bin/StS2Tracker.dll "C:\Program Files (x86)\Steam\steamapps\commo
 ```
 Game must be closed to deploy (DLL is locked while running).
 
-### Backend (web/server/)
+### Frontend build (web/frontend/)
+```bash
+cd web/frontend && npm install && npm run build
+```
+This produces `web/frontend/dist/` with `index.html` and `assets/`. Deploy by copying the dist contents to the game mods directory:
+```bash
+cp -r web/frontend/dist/* "C:\Program Files (x86)\Steam\steamapps\common\Slay the Spire 2\mods\StS2Tracker\web\"
+```
+The mod's embedded HTTP server serves these files at `http://localhost:52323`.
+
+### Backend -- development only (web/server/)
 ```bash
 pip install fastapi uvicorn watchfiles websockets pydantic
 cd web/server && python -m uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 Do NOT use `--reload` flag - it spawns child processes that become zombies on Windows. Restart manually when changing server code. Clear `__pycache__` if changes aren't picked up.
 
-### Frontend (web/frontend/)
+### Frontend dev server -- development only (web/frontend/)
 ```bash
 cd web/frontend && npm install && npm run dev
 ```
@@ -40,7 +50,20 @@ ilspycmd -p -o decompiled/full --nested-directories -r "<GameDir>\data_sts2_wind
 
 ## Architecture
 
-### Data Flow
+### Data Flow (production)
+```
+Game (sts2.dll) --[Harmony hooks]--> Mod (StS2Tracker.dll)
+                                        |
+                                        +-- Tracks combat stats in memory
+                                        +-- Writes JSON to %APPDATA%/SlayTheSpire2/tracker/
+                                        +-- Reads game save files (current_run.save, history/, progress.save)
+                                        +-- Merges both sources
+                                        +-- Embedded HTTP server (port 52323) serves REST API + WebSocket + static frontend
+                                        |
+                                     Browser (React dashboard at http://localhost:52323)
+```
+
+### Data Flow (development)
 ```
 Game (sts2.dll) --[Harmony hooks]--> Mod (StS2Tracker.dll) --[JSON files]--> Backend (FastAPI)
                                                                                 |
@@ -49,7 +72,7 @@ Game save files (current_run.save, history/*.run, progress.save) ---------------
                                                                          merge.py combines
                                                                          both sources
                                                                                 |
-                                                                         Frontend (React)
+                                                                         Frontend (React dev server)
                                                                          via REST + WebSocket
 ```
 
