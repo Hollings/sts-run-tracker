@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Cards;
@@ -7,9 +8,12 @@ using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Nodes.GodotExtensions;
+using MegaCrit.Sts2.Core.Nodes.Screens.PauseMenu;
 using MegaCrit.Sts2.Core.Rooms;
 using MegaCrit.Sts2.Core.Runs;
 using MegaCrit.Sts2.Core.ValueProps;
+using MegaCrit.Sts2.addons.mega_text;
 
 namespace StS2Tracker;
 
@@ -135,6 +139,49 @@ public static class HarmonyPatches
         catch (Exception ex)
         {
             ModEntry.Log("ERROR in AfterPowerAmountChanged patch: " + ex);
+        }
+    }
+}
+
+/// <summary>
+/// Adds a "Dashboard" button to the pause menu that opens the web tracker in the browser.
+/// </summary>
+[HarmonyPatch(typeof(NPauseMenu), nameof(NPauseMenu._Ready))]
+public static class PauseMenuPatch
+{
+    public static void Postfix(NPauseMenu __instance)
+    {
+        try
+        {
+            var container = __instance.GetNode<Control>("%ButtonContainer");
+            // Duplicate the Settings button (it's always visible and has the right scene structure)
+            var settingsBtn = container.GetNode<NPauseMenuButton>("Settings");
+            var dashboardBtn = (NPauseMenuButton)settingsBtn.Duplicate();
+            dashboardBtn.Name = "Dashboard";
+
+            // Update the label text
+            var label = dashboardBtn.GetNode<MegaLabel>("Label");
+            label.SetTextAutoSize("STS Tracker");
+
+            // Wire up click to open browser
+            dashboardBtn.Connect(
+                NClickableControl.SignalName.Released,
+                Callable.From<NButton>(_ =>
+                {
+                    var url = $"http://localhost:{ModEntry.DashboardPort}";
+                    OS.ShellOpen(url);
+                    ModEntry.Log("Opened dashboard: " + url);
+                }));
+
+            // Insert after Settings (index 1), before Compendium
+            container.AddChild(dashboardBtn);
+            container.MoveChild(dashboardBtn, settingsBtn.GetIndex() + 1);
+
+            ModEntry.Log("Dashboard button added to pause menu");
+        }
+        catch (Exception ex)
+        {
+            ModEntry.Log("ERROR adding dashboard button to pause menu: " + ex);
         }
     }
 }

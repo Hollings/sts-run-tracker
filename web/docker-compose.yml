@@ -8,7 +8,7 @@ services:
       - "8000:8000"
     volumes:
       - "${APPDATA}/SlayTheSpire2/tracker:/data/tracker:ro"
-      - "C:/Program Files (x86)/Steam/userdata/76657349/2868840/remote/profile1/saves:/data/saves:ro"
+      - "${STS2_SAVES_PATH}:/data/saves:ro"
     environment:
       - STS2_TRACKER_DIR=/data/tracker
       - STS2_SAVES_DIR=/data/saves

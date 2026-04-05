@@ -274,9 +274,10 @@ All game IDs follow the pattern `TYPE.NAME_WITH_UNDERSCORES`. To display:
 Example: `ENCOUNTER.NIBBITS_WEAK` -> `Nibbits Weak`
 
 ## File paths (Windows)
-- Tracker JSON: `C:\Users\jhol\AppData\Roaming\SlayTheSpire2\tracker\`
-- Save history: `C:\Program Files (x86)\Steam\userdata\76657349\2868840\remote\profile1\saves\history\`
-- Progress save: `C:\Program Files (x86)\Steam\userdata\76657349\2868840\remote\profile1\saves\progress.save`
+- Tracker JSON: `%APPDATA%\SlayTheSpire2\tracker\`
+- Save directory: `%APPDATA%\SlayTheSpire2\steam\<steam64id>\` (auto-discovered)
+- Save history: `<save_dir>\modded\profile1\saves\history\` (or `profile1\saves\history\` for unmodded)
+- Progress save: `<save_dir>\modded\profile1\saves\progress.save`
 
 ## Tech stack
 - **Backend**: Python FastAPI, uvicorn, watchfiles (for file watching), websockets

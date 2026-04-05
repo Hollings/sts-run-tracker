@@ -21,6 +21,10 @@ __pycache__/
 # Claude Code
 .claude/
 
+# Environment (may contain user-specific paths)
+.env
+web/.env
+
 # OS
 Thumbs.db
 .DS_Store

@@ -230,6 +230,19 @@ def merge_live_run(tracker: Optional[dict], save: Optional[dict]) -> dict:
         result["run_info"] = tracker.get("run_info", {})
         result["combats"] = tracker.get("combats", [])
 
+    # Discard save data if it belongs to a different run (stale save file)
+    if save and tracker:
+        tracker_seed = tracker.get("run_info", {}).get("seed", "")
+        save_seed = save.get("seed", "")
+        if tracker_seed and save_seed and tracker_seed != save_seed:
+            save = None
+        elif tracker_seed and not save_seed:
+            # Save has no seed (e.g. old MP save with null seed) - check timestamps
+            tracker_start = tracker.get("run_info", {}).get("start_time", 0)
+            save_start = save.get("start_time", 0)
+            if tracker_start and save_start and abs(tracker_start - save_start) > 3600:
+                save = None
+
     # Build floor timeline from save
     if save:
         # Overlay run info from save if tracker didn't have it

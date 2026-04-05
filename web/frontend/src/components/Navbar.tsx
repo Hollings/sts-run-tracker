@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 const NAV_ITEMS = [
@@ -13,6 +13,16 @@ interface Props {
 
 export default function Navbar({ connected }: Props) {
   const location = useLocation();
+  const [copied, setCopied] = useState(false);
+
+  const dashboardUrl = window.location.origin;
+
+  const handleCopyUrl = () => {
+    navigator.clipboard.writeText(dashboardUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   return (
     <nav className="bg-sts-gold sticky top-0 z-50">
@@ -46,15 +56,25 @@ export default function Navbar({ connected }: Props) {
               })}
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div
-              className={`w-2 h-2 rounded-full ${
-                connected ? "bg-sts-green" : "bg-sts-red"
-              }`}
-            />
-            <span className="text-xs text-sts-bg/70">
-              {connected ? "Live" : "Disconnected"}
-            </span>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={handleCopyUrl}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-sts-bg/10 hover:bg-sts-bg/20 transition-colors text-sts-bg/70 hover:text-sts-bg text-xs font-mono cursor-pointer"
+              title="Click to copy dashboard URL"
+            >
+              <span>{dashboardUrl}</span>
+              <span className="text-[10px]">{copied ? "(copied!)" : "(click to copy)"}</span>
+            </button>
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-2 h-2 rounded-full ${
+                  connected ? "bg-sts-green" : "bg-sts-red"
+                }`}
+              />
+              <span className="text-xs text-sts-bg/70">
+                {connected ? "Live" : "Disconnected"}
+              </span>
+            </div>
           </div>
         </div>
       </div>

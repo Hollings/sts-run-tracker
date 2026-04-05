@@ -9,6 +9,8 @@ public static class ModEntry
 {
     public static Harmony? HarmonyInstance { get; private set; }
 
+    public const int DashboardPort = 3000;
+
     public static void Initialize()
     {
         try
@@ -19,6 +21,7 @@ public static class ModEntry
             HarmonyInstance.PatchAll(typeof(ModEntry).Assembly);
 
             CombatTracker.Initialize();
+            StatusOverlay.Create(DashboardPort);
 
             Log("StS2Tracker initialized successfully. Patches applied: " +
                 HarmonyInstance.GetPatchedMethods().GetEnumerator().MoveNext());

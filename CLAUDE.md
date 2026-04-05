@@ -23,12 +23,13 @@ Game must be closed to deploy (DLL is locked while running).
 pip install fastapi uvicorn watchfiles websockets pydantic
 cd web/server && python -m uvicorn main:app --host 0.0.0.0 --port 8000
 ```
+Do NOT use `--reload` flag - it spawns child processes that become zombies on Windows. Restart manually when changing server code. Clear `__pycache__` if changes aren't picked up.
 
 ### Frontend (web/frontend/)
 ```bash
 cd web/frontend && npm install && npm run dev
 ```
-Runs on port 3000. Vite proxies `/api` and `/ws` to backend on port 8000.
+Runs on port 3000. Vite proxies `/api` and `/ws` to backend on port 8000. Tailwind config changes require a Vite restart (kill and re-run `npm run dev`).
 
 ### Decompile game assembly (for investigating new hooks)
 ```bash
@@ -55,20 +56,20 @@ Game save files (current_run.save, history/*.run, progress.save) ---------------
 ### Mod (StS2Tracker/)
 - **ModEntry.cs**: Entry point. `[ModInitializer]` attribute, creates Harmony instance, calls `PatchAll`.
 - **HarmonyPatches.cs**: Postfix patches on static methods in `MegaCrit.Sts2.Core.Hooks.Hook`. Every patch wraps in try/catch so tracker bugs never crash the game.
-- **CombatTracker.cs**: Accumulates per-combat stats in memory, writes JSON to `%APPDATA%/SlayTheSpire2/tracker/` after each combat and on each damage-received event (for death-floor safety).
+- **CombatTracker.cs**: Accumulates per-combat stats in memory, writes JSON to `%APPDATA%/SlayTheSpire2/tracker/` after each combat and on each damage-received event (for death-floor safety). Uses atomic writes (.tmp + File.Move) to prevent race conditions with the file watcher. Detects new runs by comparing seed and reinitializes. Per-player turn tracking for multiplayer.
 
 The mod manifest (`StS2Tracker.json`) sets `affects_gameplay: false`. The DLL is loaded by the game's built-in `ModManager` from `<game>/mods/StS2Tracker/`.
 
 ### Backend (web/server/)
-- **main.py**: FastAPI app. `/api/live` returns merged tracker+save data, `/api/runs` lists history, `/ws` pushes live updates via WebSocket.
-- **merge.py**: Core merge logic. Combines mod tracker JSON (combat detail: damage dealt, block, per-card stats) with game save files (floor-by-floor HP, gold, card/relic picks, events). Matches combats to floors by encounter name. Dynamically resolves modded vs unmodded save profile.
+- **main.py**: FastAPI app. `/api/live` returns merged tracker+save data, `/api/runs` lists history, `/ws` pushes live updates via WebSocket. REST handlers are sync (not async) so FastAPI runs them in a thread pool.
+- **merge.py**: Core merge logic. Combines mod tracker JSON (combat detail: damage dealt, block, per-card stats) with game save files (floor-by-floor HP, gold, card/relic picks, events). Matches combats to floors by floor number first, then encounter name fallback. Injects synthetic floors for in-progress combats not yet in the save file. Auto-discovers Steam save directory from `%APPDATA%`.
 - **watcher.py**: Watches tracker directory for file changes, triggers WebSocket broadcasts.
 
 ### Frontend (web/frontend/)
-React 19 + TypeScript + Vite + Tailwind CSS + recharts. Dark theme with amber/gold accents.
-- **pages/LiveRun.tsx**: Main dashboard. Floor timeline from merged data, expandable combat detail per floor, run totals sidebar.
+React 19 + TypeScript + Vite + Tailwind CSS + recharts. StS2 theme: `#183749` dark blue bg, `#F2F0C4` light yellow text, `#8B1913` dark red accents.
+- **pages/LiveRun.tsx**: Main dashboard. Left 2/3 shows selected floor detail (combat stats or event/rest data), right 1/3 has run totals + clickable floor list. Auto-shows victory summary on boss win.
 - **pages/RunHistory.tsx**: Table of all completed runs with filters.
-- **pages/RunDetail.tsx**: Floor-by-floor historical run view.
+- **pages/RunDetail.tsx**: Floor-by-floor historical run view with per-player HP chart.
 - **pages/Stats.tsx**: Lifetime stats from progress.save (character table, card pick/win rates, encounter difficulty).
 - **hooks/useWebSocket.ts**: Auto-reconnecting WebSocket hook.
 - **utils/types.ts**: All TypeScript interfaces for the data model.
@@ -91,6 +92,7 @@ React 19 + TypeScript + Vite + Tailwind CSS + recharts. Dark theme with amber/go
 - Harmony patches target `MegaCrit.Sts2.Core.Hooks.Hook` static methods. See `HOOKS_REFERENCE.md` for all confirmed signatures.
 - Player IDs are `1` in singleplayer, full Steam IDs (ulong) in multiplayer.
 - The mod flushes in-progress combat data to disk on every turn start and damage received, so death floors always have partial data.
+- The game rebuilds modded progress.save from run history on launch. Use `scripts/sync_saves.py` to copy unmodded progress/history to modded profile before launching.
 
 ## Docs Maintenance
 - If reference docs (HOOKS_REFERENCE.md, DESIGN.md, WEB_SPEC.md) are discovered to be incorrect or missing info, update them immediately. Always decompile and verify actual game API signatures before trusting the docs - they've been wrong before (e.g. AfterPowerApplied doesn't exist, actual method is AfterPowerAmountChanged).
