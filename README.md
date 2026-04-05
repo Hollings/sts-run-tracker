@@ -26,20 +26,22 @@ The pause menu also has an "STS Tracker" button that opens the dashboard directl
 
 ## Save files
 
-Modded runs use a **separate save profile** from unmodded runs. Your vanilla progress won't carry over automatically.
+Slay the Spire 2 keeps a completely separate save profile when mods are loaded. This means your first modded launch starts fresh -- no unlocks, no run history, no progress. This is the game's built-in behavior, not something the mod does.
+
+To bring your existing progress into the modded profile, copy the save files:
 
 ```
 %APPDATA%/SlayTheSpire2/steam/<STEAM_ID>/
-+-- profile1/          <- unmodded saves
++-- profile1/          <- unmodded saves (your existing progress)
 |   +-- saves/         (current_run, progress, prefs, history/)
 |   +-- replays/
 +-- modded/
-    +-- profile1/      <- modded saves
+    +-- profile1/      <- modded saves (starts empty)
         +-- saves/
         +-- replays/
 ```
 
-**Copy unmodded to modded** (bring vanilla progress into modded):
+**Copy unmodded to modded** (bring your existing progress into modded):
 ```bash
 STEAM="$APPDATA/SlayTheSpire2/steam/<YOUR_STEAM_ID>"
 cp "$STEAM/profile1/saves/"*.save "$STEAM/modded/profile1/saves/"
