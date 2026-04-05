@@ -2,6 +2,8 @@
 
 A Slay the Spire 2 mod that captures detailed per-player combat stats and displays them in a live browser dashboard. The dashboard is built into the mod -- no separate server or setup required.
 
+![Web Dashboard](web-dashboard.png)
+
 ## Install
 
 1. [Download the latest release](https://github.com/Hollings/sts-run-tracker/releases) and place the files in your game's mods directory:
@@ -19,6 +21,8 @@ A Slay the Spire 2 mod that captures detailed per-player combat stats and displa
 3. Open `http://localhost:52323` in your browser.
 
 The pause menu also has an "STS Tracker" button that opens the dashboard directly.
+
+![Pause Menu Button](pause-button.png)
 
 ## Save files
 
