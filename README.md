@@ -1,6 +1,6 @@
 # StS2 Run Tracker
 
-A Slay the Spire 2 mod that captures detailed per-player combat stats and displays them in a live browser dashboard. The dashboard is built into the mod -- no separate server or setup required.
+A Slay the Spire 2 mod that captures detailed per-player combat stats and displays them in a live browser dashboard. Works in both singleplayer and multiplayer. The dashboard is built into the mod -- no separate server or setup required.
 
 ![Web Dashboard](web-dashboard.png)
 
