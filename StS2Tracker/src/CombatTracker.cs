@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
@@ -16,6 +17,8 @@ namespace StS2Tracker;
 
 public static class CombatTracker
 {
+    private const string CurrentModVersion = "0.1.0";
+    private static readonly ReaderWriterLockSlim _rwLock = new();
     private static readonly List<CombatData> _combats = new();
     private static CombatData? _current;
     private static int _turnNumber;
@@ -23,6 +26,12 @@ public static class CombatTracker
     private static RunInfo? _runInfo;
     private static string? _outputPath;
     private static readonly string _outputDir;
+
+    /// <summary>
+    /// Fired after any state change. WebSocketManager registers a handler
+    /// to broadcast updates to connected clients.
+    /// </summary>
+    public static Action? OnDataChanged;
     private static readonly JsonSerializerOptions s_jsonOptions = new()
     {
         WriteIndented = true,
@@ -44,6 +53,7 @@ public static class CombatTracker
         _playerTurns.Clear();
         _runInfo = null;
         _outputPath = null;
+        OnDataChanged = null;
         ModEntry.Log("CombatTracker initialized. Output dir: " + _outputDir);
     }
 
@@ -53,119 +63,146 @@ public static class CombatTracker
     {
         if (combatState == null) return;
 
-        _turnNumber = 0;
-        _playerTurns.Clear();
-
-        // Detect new run: if the seed changed, reinitialize everything
-        if (runState != null && _runInfo != null)
+        _rwLock.EnterWriteLock();
+        try
         {
-            string currentSeed = runState.Rng?.StringSeed ?? "unknown";
-            if (currentSeed != _runInfo.Seed)
+            _turnNumber = 0;
+            _playerTurns.Clear();
+
+            // Detect new run: if the seed changed, reinitialize everything
+            if (runState != null && _runInfo != null)
             {
-                ModEntry.Log($"New run detected (seed changed: {_runInfo.Seed} -> {currentSeed}). Resetting tracker.");
-                Initialize();
+                string currentSeed = runState.Rng?.StringSeed ?? "unknown";
+                if (currentSeed != _runInfo.Seed)
+                {
+                    ModEntry.Log($"New run detected (seed changed: {_runInfo.Seed} -> {currentSeed}). Resetting tracker.");
+                    Initialize();
+                }
             }
-        }
 
-        // Capture run info once on first combat
-        if (_runInfo == null && runState != null)
-        {
-            string seed = runState.Rng?.StringSeed ?? "unknown";
-            long startTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-
-            _runInfo = new RunInfo
+            // Capture run info once on first combat
+            if (_runInfo == null && runState != null)
             {
-                Seed = seed,
-                StartTime = startTime,
-                Ascension = runState.AscensionLevel,
-                Acts = runState.Acts?.Select(a => a.Id.ToString()).ToList() ?? new(),
-                GameMode = runState.Modifiers?.Count > 0 ? "custom" : "standard",
+                string seed = runState.Rng?.StringSeed ?? "unknown";
+                long startTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
+                _runInfo = new RunInfo
+                {
+                    Seed = seed,
+                    StartTime = startTime,
+                    Ascension = runState.AscensionLevel,
+                    Acts = runState.Acts?.Select(a => a.Id.ToString()).ToList() ?? new(),
+                    GameMode = runState.Modifiers?.Count > 0 ? "custom" : "standard",
+                };
+
+                // Capture player info from the combat state (has all players)
+                foreach (var player in combatState.Players)
+                {
+                    _runInfo.Players.Add(new RunPlayerInfo
+                    {
+                        SteamId = player.NetId.ToString(),
+                        Character = player.Character.Id.ToString(),
+                    });
+                }
+
+                _outputPath = Path.Combine(_outputDir, $"{seed}_{startTime}.json");
+
+                ModEntry.Log($"Run info captured: {seed} A{_runInfo.Ascension} " +
+                             $"{string.Join(", ", _runInfo.Players.Select(p => p.Character))}");
+            }
+
+            var encounter = combatState.Encounter;
+            int floor = runState?.TotalFloor ?? (_combats.Count + 1);
+            _current = new CombatData
+            {
+                Encounter = encounter.Id.ToString(),
+                Monsters = combatState.Enemies
+                    .Select(e => e.ModelId.ToString())
+                    .ToList(),
+                Floor = floor,
             };
 
-            // Capture player info from the combat state (has all players)
+            // Initialize player stats
             foreach (var player in combatState.Players)
             {
-                _runInfo.Players.Add(new RunPlayerInfo
+                var pid = player.NetId.ToString();
+                _current.Players[pid] = new PlayerCombatStats
                 {
-                    SteamId = player.NetId.ToString(),
                     Character = player.Character.Id.ToString(),
-                });
+                    SteamId = pid,
+                };
             }
 
-            _outputPath = Path.Combine(_outputDir, $"{seed}_{startTime}.json");
-
-            ModEntry.Log($"Run info captured: {seed} A{_runInfo.Ascension} " +
-                         $"{string.Join(", ", _runInfo.Players.Select(p => p.Character))}");
+            ModEntry.Log($"Combat started: {_current.Encounter} (floor {floor}) with {_current.Players.Count} player(s)");
         }
-
-        var encounter = combatState.Encounter;
-        int floor = runState?.TotalFloor ?? (_combats.Count + 1);
-        _current = new CombatData
+        finally
         {
-            Encounter = encounter.Id.ToString(),
-            Monsters = combatState.Enemies
-                .Select(e => e.ModelId.ToString())
-                .ToList(),
-            Floor = floor,
-        };
-
-        // Initialize player stats
-        foreach (var player in combatState.Players)
-        {
-            var pid = player.NetId.ToString();
-            _current.Players[pid] = new PlayerCombatStats
-            {
-                Character = player.Character.Id.ToString(),
-                SteamId = pid,
-            };
+            _rwLock.ExitWriteLock();
         }
-
-        ModEntry.Log($"Combat started: {_current.Encounter} (floor {floor}) with {_current.Players.Count} player(s)");
+        OnDataChanged?.Invoke();
     }
 
     public static void OnCombatEnd(IRunState? runState, CombatState? combatState, CombatRoom? room)
     {
-        if (_current == null) return;
-
-        _current.TotalTurns = _turnNumber;
-
-        // Find in-progress entry BEFORE changing result (same object reference)
-        int existingIdx = _combats.FindIndex(c => c.Encounter == _current.Encounter && c.Floor == _current.Floor && c.Result == "in_progress");
-
-        // Determine result
-        bool victory = combatState?.Enemies.All(e => !e.IsAlive) ?? false;
-        _current.Result = victory ? "win" : "loss";
-
-        // Replace in-progress entry if we had one, otherwise add
-        if (existingIdx >= 0)
-            _combats[existingIdx] = _current;
-        else
-            _combats.Add(_current);
-
-        ModEntry.Log($"Combat ended: {_current.Encounter} = {_current.Result} " +
-                     $"({_current.TotalTurns} turns, {_current.Players.Count} players)");
-
-        foreach (var (pid, stats) in _current.Players)
+        _rwLock.EnterWriteLock();
+        try
         {
-            ModEntry.Log($"  Player {pid}: dealt={stats.DamageDealt} taken={stats.DamageTaken} " +
-                         $"block={stats.BlockGained} cards={stats.CardsPlayed}");
-        }
+            if (_current == null) return;
 
-        WriteToDisk();
-        _current = null;
+            _current.TotalTurns = _turnNumber;
+
+            // Find in-progress entry BEFORE changing result (same object reference)
+            int existingIdx = _combats.FindIndex(c => c.Encounter == _current.Encounter && c.Floor == _current.Floor && c.Result == "in_progress");
+
+            // Determine result
+            bool victory = combatState?.Enemies.All(e => !e.IsAlive) ?? false;
+            _current.Result = victory ? "win" : "loss";
+
+            // Replace in-progress entry if we had one, otherwise add
+            if (existingIdx >= 0)
+                _combats[existingIdx] = _current;
+            else
+                _combats.Add(_current);
+
+            ModEntry.Log($"Combat ended: {_current.Encounter} = {_current.Result} " +
+                         $"({_current.TotalTurns} turns, {_current.Players.Count} players)");
+
+            foreach (var (pid, stats) in _current.Players)
+            {
+                ModEntry.Log($"  Player {pid}: dealt={stats.DamageDealt} taken={stats.DamageTaken} " +
+                             $"block={stats.BlockGained} cards={stats.CardsPlayed}");
+            }
+
+            WriteToDisk();
+            _current = null;
+        }
+        finally
+        {
+            _rwLock.ExitWriteLock();
+        }
+        OnDataChanged?.Invoke();
     }
 
     public static void OnTurnStart(Player player)
     {
-        _turnNumber++;
+        _rwLock.EnterWriteLock();
+        try
+        {
+            _turnNumber++;
 
-        // Track per-player turn count
-        string pid = player.NetId.ToString();
-        if (!_playerTurns.ContainsKey(pid))
-            _playerTurns[pid] = 0;
-        _playerTurns[pid]++;
+            // Track per-player turn count
+            string pid = player.NetId.ToString();
+            if (!_playerTurns.ContainsKey(pid))
+                _playerTurns[pid] = 0;
+            _playerTurns[pid]++;
 
-        FlushInProgress();
+            FlushInProgress();
+        }
+        finally
+        {
+            _rwLock.ExitWriteLock();
+        }
+        OnDataChanged?.Invoke();
     }
 
     /// <summary>
@@ -191,155 +228,243 @@ public static class CombatTracker
 
     public static void OnDamageGiven(Creature? dealer, DamageResult result, Creature target, CardModel? cardSource)
     {
-        if (_current == null) return;
-
-        // Attribute damage to the dealer's player
-        string? dealerPid = GetPlayerId(dealer);
-        if (dealerPid != null && _current.Players.TryGetValue(dealerPid, out var dealerStats))
+        _rwLock.EnterWriteLock();
+        try
         {
-            dealerStats.DamageDealt += result.TotalDamage;
+            if (_current == null) return;
 
-            // Per-turn tracking
-            EnsureTurnEntry(dealerStats);
-            dealerStats.DamagePerTurn[^1] += result.TotalDamage;
-
-            // Per-target tracking
-            string targetKey = target.ModelId.ToString();
-            if (!dealerStats.DamageByTarget.ContainsKey(targetKey))
-                dealerStats.DamageByTarget[targetKey] = 0;
-            dealerStats.DamageByTarget[targetKey] += result.TotalDamage;
-
-            // Per-card damage tracking
-            string cardKey = cardSource?.Id.ToString() ?? "_non_card";
-            if (!dealerStats.DamageByCard.ContainsKey(cardKey))
-                dealerStats.DamageByCard[cardKey] = new CardDamageStats();
-            var cardStats = dealerStats.DamageByCard[cardKey];
-            cardStats.TotalDamage += result.TotalDamage;
-            cardStats.Hits++;
-            if (result.TotalDamage > cardStats.MaxHit)
-                cardStats.MaxHit = result.TotalDamage;
-            if (result.WasTargetKilled)
-                cardStats.Kills++;
-
-            if (result.WasTargetKilled)
-                dealerStats.Kills++;
-        }
-
-        // Track damage received by target player
-        string? targetPid = GetPlayerId(target);
-        if (targetPid != null && _current.Players.TryGetValue(targetPid, out var targetStats))
-        {
-            targetStats.DamageTaken += result.UnblockedDamage;
-            targetStats.DamageBlocked += result.BlockedDamage;
-
-            // Per-turn damage taken
-            EnsureTurnEntry(targetStats);
-            targetStats.DamageTakenPerTurn[^1] += result.UnblockedDamage;
-            targetStats.DamageBlockedPerTurn[^1] += result.BlockedDamage;
-
-            // Per-source damage breakdown (both blocked and unblocked)
-            string sourceKey = dealer?.ModelId.ToString() ?? "_environmental";
-            if (!targetStats.DamageTakenBySource.ContainsKey(sourceKey))
-                targetStats.DamageTakenBySource[sourceKey] = new DamageTakenStats();
-            var srcStats = targetStats.DamageTakenBySource[sourceKey];
-            srcStats.Unblocked += result.UnblockedDamage;
-            srcStats.Blocked += result.BlockedDamage;
-            srcStats.Hits++;
-            if (result.UnblockedDamage > srcStats.MaxHit)
-                srcStats.MaxHit = result.UnblockedDamage;
-
-            // Log individual hit for granular analysis
-            targetStats.HitsReceived.Add(new HitReceivedEntry
+            // Attribute damage to the dealer's player
+            string? dealerPid = GetPlayerId(dealer);
+            if (dealerPid != null && _current.Players.TryGetValue(dealerPid, out var dealerStats))
             {
-                Source = sourceKey,
-                Unblocked = result.UnblockedDamage,
-                Blocked = result.BlockedDamage,
-                Turn = _turnNumber,
-                WasKilled = result.WasTargetKilled,
-            });
+                dealerStats.DamageDealt += result.TotalDamage;
 
-            // Flush after taking damage - this could be the killing blow
-            FlushInProgress();
+                // Per-turn tracking
+                EnsureTurnEntry(dealerStats);
+                dealerStats.DamagePerTurn[^1] += result.TotalDamage;
+
+                // Per-target tracking
+                string targetKey = target.ModelId.ToString();
+                if (!dealerStats.DamageByTarget.ContainsKey(targetKey))
+                    dealerStats.DamageByTarget[targetKey] = 0;
+                dealerStats.DamageByTarget[targetKey] += result.TotalDamage;
+
+                // Per-card damage tracking
+                string cardKey = cardSource?.Id.ToString() ?? "_non_card";
+                if (!dealerStats.DamageByCard.ContainsKey(cardKey))
+                    dealerStats.DamageByCard[cardKey] = new CardDamageStats();
+                var cardStats = dealerStats.DamageByCard[cardKey];
+                cardStats.TotalDamage += result.TotalDamage;
+                cardStats.Hits++;
+                if (result.TotalDamage > cardStats.MaxHit)
+                    cardStats.MaxHit = result.TotalDamage;
+                if (result.WasTargetKilled)
+                    cardStats.Kills++;
+
+                if (result.WasTargetKilled)
+                    dealerStats.Kills++;
+            }
+
+            // Track damage received by target player
+            string? targetPid = GetPlayerId(target);
+            if (targetPid != null && _current.Players.TryGetValue(targetPid, out var targetStats))
+            {
+                targetStats.DamageTaken += result.UnblockedDamage;
+                targetStats.DamageBlocked += result.BlockedDamage;
+
+                // Per-turn damage taken
+                EnsureTurnEntry(targetStats);
+                targetStats.DamageTakenPerTurn[^1] += result.UnblockedDamage;
+                targetStats.DamageBlockedPerTurn[^1] += result.BlockedDamage;
+
+                // Per-source damage breakdown (both blocked and unblocked)
+                string sourceKey = dealer?.ModelId.ToString() ?? "_environmental";
+                if (!targetStats.DamageTakenBySource.ContainsKey(sourceKey))
+                    targetStats.DamageTakenBySource[sourceKey] = new DamageTakenStats();
+                var srcStats = targetStats.DamageTakenBySource[sourceKey];
+                srcStats.Unblocked += result.UnblockedDamage;
+                srcStats.Blocked += result.BlockedDamage;
+                srcStats.Hits++;
+                if (result.UnblockedDamage > srcStats.MaxHit)
+                    srcStats.MaxHit = result.UnblockedDamage;
+
+                // Log individual hit for granular analysis
+                targetStats.HitsReceived.Add(new HitReceivedEntry
+                {
+                    Source = sourceKey,
+                    Unblocked = result.UnblockedDamage,
+                    Blocked = result.BlockedDamage,
+                    Turn = _turnNumber,
+                    WasKilled = result.WasTargetKilled,
+                });
+
+                // Flush after taking damage - this could be the killing blow
+                FlushInProgress();
+            }
         }
+        finally
+        {
+            _rwLock.ExitWriteLock();
+        }
+        OnDataChanged?.Invoke();
     }
 
     public static void OnBlockGained(Creature creature, decimal amount)
     {
-        if (_current == null) return;
-
-        string? pid = GetPlayerId(creature);
-        if (pid != null && _current.Players.TryGetValue(pid, out var stats))
+        _rwLock.EnterWriteLock();
+        try
         {
-            stats.BlockGained += (int)amount;
-            EnsureTurnEntry(stats);
-            stats.BlockPerTurn[^1] += (int)amount;
+            if (_current == null) return;
+
+            string? pid = GetPlayerId(creature);
+            if (pid != null && _current.Players.TryGetValue(pid, out var stats))
+            {
+                stats.BlockGained += (int)amount;
+                EnsureTurnEntry(stats);
+                stats.BlockPerTurn[^1] += (int)amount;
+            }
         }
+        finally
+        {
+            _rwLock.ExitWriteLock();
+        }
+        OnDataChanged?.Invoke();
     }
 
     public static void OnCardPlayed(CardPlay cardPlay)
     {
-        if (_current == null) return;
-
-        var card = cardPlay.Card;
-        string? pid = card.Owner?.NetId.ToString();
-        if (pid != null && _current.Players.TryGetValue(pid, out var stats))
+        _rwLock.EnterWriteLock();
+        try
         {
-            stats.CardsPlayed++;
-            EnsureTurnEntry(stats);
-            stats.CardsPerTurn[^1]++;
+            if (_current == null) return;
 
-            stats.CardSequence.Add(new CardPlayEntry
+            var card = cardPlay.Card;
+            string? pid = card.Owner?.NetId.ToString();
+            if (pid != null && _current.Players.TryGetValue(pid, out var stats))
             {
-                Card = card.Id.ToString(),
-                Target = cardPlay.Target?.ModelId.ToString(),
-                Turn = _turnNumber,
-            });
+                stats.CardsPlayed++;
+                EnsureTurnEntry(stats);
+                stats.CardsPerTurn[^1]++;
+
+                stats.CardSequence.Add(new CardPlayEntry
+                {
+                    Card = card.Id.ToString(),
+                    Target = cardPlay.Target?.ModelId.ToString(),
+                    Turn = _turnNumber,
+                });
+            }
         }
+        finally
+        {
+            _rwLock.ExitWriteLock();
+        }
+        OnDataChanged?.Invoke();
     }
 
     public static void OnPowerChanged(PowerModel power, int amount, Creature? applier)
     {
-        if (_current == null) return;
-
-        string powerId = power.Id.ToString();
-        Creature target = power.Owner;
-        string targetId = target.ModelId.ToString();
-        string? applierId = applier?.ModelId.ToString();
-
-        // Track on the applier player (buffs/debuffs they caused)
-        string? applierPid = GetPlayerId(applier);
-        if (applierPid != null && _current.Players.TryGetValue(applierPid, out var applierStats))
+        _rwLock.EnterWriteLock();
+        try
         {
-            if (!applierStats.PowersApplied.ContainsKey(powerId))
-                applierStats.PowersApplied[powerId] = 0;
-            applierStats.PowersApplied[powerId] += amount;
-        }
+            if (_current == null) return;
 
-        // Track on the target player (buffs/debuffs they received)
-        string? targetPid = GetPlayerId(target);
-        if (targetPid != null && _current.Players.TryGetValue(targetPid, out var targetStats))
-        {
-            if (!targetStats.PowersReceived.ContainsKey(powerId))
-                targetStats.PowersReceived[powerId] = 0;
-            targetStats.PowersReceived[powerId] += amount;
-        }
+            string powerId = power.Id.ToString();
+            Creature target = power.Owner;
+            string targetId = target.ModelId.ToString();
+            string? applierId = applier?.ModelId.ToString();
 
-        // Log the event on whichever player is involved (prefer target, fall back to applier)
-        string? logPid = targetPid ?? applierPid;
-        if (logPid != null && _current.Players.TryGetValue(logPid, out var logStats))
-        {
-            logStats.PowerLog.Add(new PowerEventEntry
+            // Track on the applier player (buffs/debuffs they caused)
+            string? applierPid = GetPlayerId(applier);
+            if (applierPid != null && _current.Players.TryGetValue(applierPid, out var applierStats))
             {
-                Power = powerId,
-                Stacks = amount,
-                Target = targetId,
-                Source = applierId,
-                Turn = _turnNumber,
-            });
+                if (!applierStats.PowersApplied.ContainsKey(powerId))
+                    applierStats.PowersApplied[powerId] = 0;
+                applierStats.PowersApplied[powerId] += amount;
+            }
+
+            // Track on the target player (buffs/debuffs they received)
+            string? targetPid = GetPlayerId(target);
+            if (targetPid != null && _current.Players.TryGetValue(targetPid, out var targetStats))
+            {
+                if (!targetStats.PowersReceived.ContainsKey(powerId))
+                    targetStats.PowersReceived[powerId] = 0;
+                targetStats.PowersReceived[powerId] += amount;
+            }
+
+            // Log the event on whichever player is involved (prefer target, fall back to applier)
+            string? logPid = targetPid ?? applierPid;
+            if (logPid != null && _current.Players.TryGetValue(logPid, out var logStats))
+            {
+                logStats.PowerLog.Add(new PowerEventEntry
+                {
+                    Power = powerId,
+                    Stacks = amount,
+                    Target = targetId,
+                    Source = applierId,
+                    Turn = _turnNumber,
+                });
+            }
+        }
+        finally
+        {
+            _rwLock.ExitWriteLock();
+        }
+        OnDataChanged?.Invoke();
+    }
+
+    // --- Thread-safe read access ---
+
+    /// <summary>
+    /// Thread-safe snapshot of current tracker data as a JSON string.
+    /// Called from HTTP threads to serve /api/live and WebSocket updates.
+    /// </summary>
+    public static string? GetSnapshotJson()
+    {
+        _rwLock.EnterReadLock();
+        try
+        {
+            var data = BuildSnapshot();
+            if (data == null) return null;
+            return JsonSerializer.Serialize(data, s_jsonOptions);
+        }
+        finally
+        {
+            _rwLock.ExitReadLock();
+        }
+    }
+
+    /// <summary>
+    /// Thread-safe snapshot of current tracker data as typed object.
+    /// Returns null if no run is active.
+    /// </summary>
+    public static RunTrackerData? GetSnapshot()
+    {
+        _rwLock.EnterReadLock();
+        try
+        {
+            return BuildSnapshot();
+        }
+        finally
+        {
+            _rwLock.ExitReadLock();
         }
     }
 
     // --- Helpers ---
+
+    /// <summary>
+    /// Build a RunTrackerData snapshot. Caller must hold a read or write lock.
+    /// </summary>
+    private static RunTrackerData? BuildSnapshot()
+    {
+        if (_runInfo == null) return null;
+        return new RunTrackerData
+        {
+            ModVersion = CurrentModVersion,
+            RunInfo = _runInfo,
+            Combats = _combats.ToList(),  // shallow copy to isolate from future mutations
+        };
+    }
 
     private static string? GetPlayerId(Creature? creature)
     {
@@ -380,13 +505,7 @@ public static class CombatTracker
             if (!Directory.Exists(_outputDir))
                 Directory.CreateDirectory(_outputDir);
 
-            var runData = new RunTrackerData
-            {
-                ModVersion = "0.1.0",
-                RunInfo = _runInfo,
-                Combats = _combats.ToList(),
-            };
-
+            var runData = BuildSnapshot()!;
             string json = JsonSerializer.Serialize(runData, s_jsonOptions);
             string tempPath = _outputPath + ".tmp";
             File.WriteAllText(tempPath, json);
