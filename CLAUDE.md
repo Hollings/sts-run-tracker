@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-A Slay the Spire 2 run tracker: a C# Harmony mod that hooks into combat events to capture per-player damage/block/card data, embeds an HTTP server serving a React dashboard, and optionally uses a FastAPI backend for development. In production, the mod serves the dashboard directly at `http://localhost:52323` with no external dependencies.
+A Slay the Spire 2 run tracker: a C# Harmony mod that hooks into combat events to capture per-player damage/block/card data, embeds an HTTP server serving a React dashboard directly from the game at `http://localhost:52323`.
 
 ## Build & Run Commands
 
@@ -18,28 +18,28 @@ cp StS2Tracker/bin/StS2Tracker.dll "C:\Program Files (x86)\Steam\steamapps\commo
 ```
 Game must be closed to deploy (DLL is locked while running).
 
-### Frontend build (web/frontend/)
+### Frontend (web/frontend/)
 ```bash
 cd web/frontend && npm install && npm run build
 ```
-This produces `web/frontend/dist/` with `index.html` and `assets/`. Deploy by copying the dist contents to the game mods directory:
+Produces `web/frontend/dist/` with `index.html` and `assets/`. Deploy by copying to the game mods directory:
 ```bash
 cp -r web/frontend/dist/* "C:\Program Files (x86)\Steam\steamapps\common\Slay the Spire 2\mods\StS2Tracker\web\"
 ```
 The mod's embedded HTTP server serves these files at `http://localhost:52323`.
 
-### Backend -- development only (web/server/)
+For frontend development with hot reload:
+```bash
+cd web/frontend && npm run dev
+```
+Runs on port 3000. Vite proxies `/api` and `/ws` to port 8000 (requires the Python dev server below).
+
+### Dev server (web/server/) -- development only
 ```bash
 pip install fastapi uvicorn watchfiles websockets pydantic
 cd web/server && python -m uvicorn main:app --host 0.0.0.0 --port 8000
 ```
-Do NOT use `--reload` flag - it spawns child processes that become zombies on Windows. Restart manually when changing server code. Clear `__pycache__` if changes aren't picked up.
-
-### Frontend dev server -- development only (web/frontend/)
-```bash
-cd web/frontend && npm install && npm run dev
-```
-Runs on port 3000. Vite proxies `/api` and `/ws` to backend on port 8000. Tailwind config changes require a Vite restart (kill and re-run `npm run dev`).
+Do NOT use `--reload` flag - it spawns child processes that become zombies on Windows. This server is only needed for frontend development with hot reload. In production, the mod serves everything.
 
 ### Decompile game assembly (for investigating new hooks)
 ```bash
@@ -50,50 +50,38 @@ ilspycmd -p -o decompiled/full --nested-directories -r "<GameDir>\data_sts2_wind
 
 ## Architecture
 
-### Data Flow (production)
+### Data Flow
 ```
 Game (sts2.dll) --[Harmony hooks]--> Mod (StS2Tracker.dll)
                                         |
-                                        +-- Tracks combat stats in memory
-                                        +-- Writes JSON to %APPDATA%/SlayTheSpire2/tracker/
-                                        +-- Reads game save files (current_run.save, history/, progress.save)
-                                        +-- Merges both sources
-                                        +-- Embedded HTTP server (port 52323) serves REST API + WebSocket + static frontend
+                                        +-- Tracks combat stats in memory (CombatTracker)
+                                        +-- Reads game save files (SaveFileReader)
+                                        +-- Merges both sources (MergeEngine)
+                                        +-- Embedded HTTP server (HttpServer, port 52323)
+                                        |   +-- REST API: /api/live, /api/runs, /api/progress
+                                        |   +-- WebSocket: /ws (live combat updates)
+                                        |   +-- Static files: built React frontend
                                         |
-                                     Browser (React dashboard at http://localhost:52323)
+                                     Browser (http://localhost:52323)
 ```
 
-### Data Flow (development)
-```
-Game (sts2.dll) --[Harmony hooks]--> Mod (StS2Tracker.dll) --[JSON files]--> Backend (FastAPI)
-                                                                                |
-Game save files (current_run.save, history/*.run, progress.save) ---------------+
-                                                                                |
-                                                                         merge.py combines
-                                                                         both sources
-                                                                                |
-                                                                         Frontend (React dev server)
-                                                                         via REST + WebSocket
-```
-
-### Mod (StS2Tracker/)
-- **ModEntry.cs**: Entry point. `[ModInitializer]` attribute, creates Harmony instance, calls `PatchAll`.
-- **HarmonyPatches.cs**: Postfix patches on static methods in `MegaCrit.Sts2.Core.Hooks.Hook`. Every patch wraps in try/catch so tracker bugs never crash the game.
-- **CombatTracker.cs**: Accumulates per-combat stats in memory, writes JSON to `%APPDATA%/SlayTheSpire2/tracker/` after each combat and on each damage-received event (for death-floor safety). Uses atomic writes (.tmp + File.Move) to prevent race conditions with the file watcher. Detects new runs by comparing seed and reinitializes. Per-player turn tracking for multiplayer.
-
-The mod manifest (`StS2Tracker.json`) sets `affects_gameplay: false`. The DLL is loaded by the game's built-in `ModManager` from `<game>/mods/StS2Tracker/`.
-
-### Backend (web/server/)
-- **main.py**: FastAPI app. `/api/live` returns merged tracker+save data, `/api/runs` lists history, `/ws` pushes live updates via WebSocket. REST handlers are sync (not async) so FastAPI runs them in a thread pool.
-- **merge.py**: Core merge logic. Combines mod tracker JSON (combat detail: damage dealt, block, per-card stats) with game save files (floor-by-floor HP, gold, card/relic picks, events). Matches combats to floors by floor number first, then encounter name fallback. Injects synthetic floors for in-progress combats not yet in the save file. Auto-discovers Steam save directory from `%APPDATA%`.
-- **watcher.py**: Watches tracker directory for file changes, triggers WebSocket broadcasts.
+### Mod (StS2Tracker/src/)
+- **ModEntry.cs**: Entry point. `[ModInitializer]` attribute, creates Harmony instance, starts HTTP server.
+- **HarmonyPatches.cs**: Postfix patches on `MegaCrit.Sts2.Core.Hooks.Hook` static methods. Every patch wraps in try/catch so tracker bugs never crash the game. Includes pause menu patch that adds "STS Tracker" button.
+- **CombatTracker.cs**: Accumulates per-combat stats in memory with `ReaderWriterLockSlim` for thread safety. Writes JSON to `%APPDATA%/SlayTheSpire2/tracker/` as backup. Fires `OnDataChanged` callback for WebSocket broadcasts.
+- **HttpServer.cs**: `System.Net.HttpListener` on a background thread. Routes REST API, WebSocket, and static file requests. `RunOnMainThread()` pattern for safe game state access.
+- **SaveFileReader.cs**: Reads game save files from disk. Auto-discovers save directory from `%APPDATA%`. Handles modded vs unmodded profiles.
+- **MergeEngine.cs**: Merges in-memory combat data with save file floor history. Builds unified run view with per-floor detail, combat stats, and run totals.
+- **ApiHandlers.cs**: REST endpoint handlers for /api/live, /api/runs, /api/progress.
+- **WebSocketManager.cs**: Manages WebSocket connections, broadcasts combat updates to all clients.
+- **StatusOverlay.cs**: Godot CanvasLayer showing dashboard URL in top-right corner.
 
 ### Frontend (web/frontend/)
 React 19 + TypeScript + Vite + Tailwind CSS + recharts. StS2 theme: `#183749` dark blue bg, `#F2F0C4` light yellow text, `#8B1913` dark red accents.
-- **pages/LiveRun.tsx**: Main dashboard. Left 2/3 shows selected floor detail (combat stats or event/rest data), right 1/3 has run totals + clickable floor list. Auto-shows victory summary on boss win.
+- **pages/LiveRun.tsx**: Main dashboard. Left 2/3 shows selected floor detail, right 1/3 has run totals + clickable floor list. Auto-shows victory summary on boss win.
 - **pages/RunHistory.tsx**: Table of all completed runs with filters.
 - **pages/RunDetail.tsx**: Floor-by-floor historical run view with per-player HP chart.
-- **pages/Stats.tsx**: Lifetime stats from progress.save (character table, card pick/win rates, encounter difficulty).
+- **pages/Stats.tsx**: Lifetime stats from progress.save.
 - **hooks/useWebSocket.ts**: Auto-reconnecting WebSocket hook.
 - **utils/types.ts**: All TypeScript interfaces for the data model.
 
@@ -102,26 +90,24 @@ React 19 + TypeScript + Vite + Tailwind CSS + recharts. StS2 theme: `#183749` da
 - **Primary saves (game reads/writes here):** `%APPDATA%\SlayTheSpire2\steam\<steam64id>\`
   - Modded: `.../modded/profile1/saves/`
   - Unmodded: `.../profile1/saves/`
-- Cloud sync copy (NOT what the game reads): `Steam\userdata\<steam32id>\2868840\remote\`
-- Multiplayer save: `current_run_mp.save` (separate from singleplayer `current_run.save`)
 - Game logs: `%APPDATA%\SlayTheSpire2\logs\godot.log`
 - Game install: `C:\Program Files (x86)\Steam\steamapps\common\Slay the Spire 2\`
 
 ## Important Conventions
 
 - Do NOT use emojis in Python code (Windows `charmap` encoding errors).
-- Game IDs (e.g. `CARD.STRIKE_IRONCLAD`) display as: split on `.`, replace `_` with space, title case -> "Strike Ironclad". Frontend has `formatGameId()`, Python has `short_id()`.
-- The game uses separate save profiles for modded vs unmodded play. `merge.py` handles this with `get_save_profile_dir()` which prefers modded if it has data.
+- Game IDs (e.g. `CARD.STRIKE_IRONCLAD`) display as: split on `.`, replace `_` with space, title case -> "Strike Ironclad". Frontend has `formatGameId()`, C# has `MergeEngine.ShortId()`.
+- The game uses separate save profiles for modded vs unmodded play. `SaveFileReader` handles this with `GetSaveProfileDir()` which prefers modded if it has data.
 - Harmony patches target `MegaCrit.Sts2.Core.Hooks.Hook` static methods. See `HOOKS_REFERENCE.md` for all confirmed signatures.
 - Player IDs are `1` in singleplayer, full Steam IDs (ulong) in multiplayer.
-- The mod flushes in-progress combat data to disk on every turn start and damage received, so death floors always have partial data.
-- The game rebuilds modded progress.save from run history on launch. Use `scripts/sync_saves.py` to copy unmodded progress/history to modded profile before launching.
+- The mod flushes in-progress combat data on every turn start and damage received, so death floors always have partial data.
+- CombatTracker uses `ReaderWriterLockSlim` -- HTTP threads read via `GetSnapshot()`/`GetSnapshotJson()`, game thread writes under write lock.
 
 ## Docs Maintenance
-- If reference docs (HOOKS_REFERENCE.md, DESIGN.md, WEB_SPEC.md) are discovered to be incorrect or missing info, update them immediately. Always decompile and verify actual game API signatures before trusting the docs - they've been wrong before (e.g. AfterPowerApplied doesn't exist, actual method is AfterPowerAmountChanged).
+- If reference docs (HOOKS_REFERENCE.md, DESIGN.md, WEB_SPEC.md) are discovered to be incorrect or missing info, update them immediately. Always decompile and verify actual game API signatures before trusting the docs.
 
 ## Reference Documentation
 - `HOOKS_REFERENCE.md`: Full decompiled API surface - hook signatures, data types, identity chain, mod system details.
 - `DESIGN.md`: Project roadmap, MVP/Phase 2/Phase 3 goals, risk table.
-- `WEB_SPEC.md`: Web dashboard spec with data formats, component designs, Docker setup.
+- `WEB_SPEC.md`: Web dashboard spec with data formats, component designs.
 - `decompiled/`: ILSpy output of game types (gitignored, regenerable).
