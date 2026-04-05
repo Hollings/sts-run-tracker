@@ -26,22 +26,15 @@ The pause menu also has an "STS Tracker" button that opens the dashboard directl
 
 ## Save files
 
-Slay the Spire 2 keeps a completely separate save profile when mods are loaded. This means your first modded launch starts fresh -- no unlocks, no run history, no progress. This is the game's built-in behavior, not something the mod does.
+Slay the Spire 2 keeps a completely separate save profile when mods are loaded. This means your first modded launch starts fresh -- no unlocks, no run history, no progress. In order for your existing save file to be used in the modded game, you must copy the save files, replays, and history data. Close the game before copying.
 
-To bring your existing progress into the modded profile, copy the save files:
-
+Save files are located at `%APPDATA%/SlayTheSpire2/steam/<STEAM_ID>/`:
 ```
-%APPDATA%/SlayTheSpire2/steam/<STEAM_ID>/
-+-- profile1/          <- unmodded saves (your existing progress)
-|   +-- saves/         (current_run, progress, prefs, history/)
-|   +-- replays/
-+-- modded/
-    +-- profile1/      <- modded saves (starts empty)
-        +-- saves/
-        +-- replays/
+profile1/              <- unmodded saves
+modded/profile1/       <- modded saves
 ```
 
-**Copy unmodded to modded** (bring your existing progress into modded):
+1. Copy unmodded to modded (bring your existing progress into modded):
 ```bash
 STEAM="$APPDATA/SlayTheSpire2/steam/<YOUR_STEAM_ID>"
 cp "$STEAM/profile1/saves/"*.save "$STEAM/modded/profile1/saves/"
@@ -50,15 +43,13 @@ cp "$STEAM/profile1/saves/history/"* "$STEAM/modded/profile1/saves/history/"
 cp "$STEAM/profile1/replays/"* "$STEAM/modded/profile1/replays/"
 ```
 
-**Copy modded to unmodded** (bring modded progress back to vanilla):
+2. Copy modded to unmodded (bring modded progress back to vanilla):
 ```bash
 cp "$STEAM/modded/profile1/saves/"*.save "$STEAM/profile1/saves/"
 cp "$STEAM/modded/profile1/saves/"*.save.backup "$STEAM/profile1/saves/"
 cp "$STEAM/modded/profile1/saves/history/"* "$STEAM/profile1/saves/history/"
 cp "$STEAM/modded/profile1/replays/"* "$STEAM/modded/profile1/replays/"
 ```
-
-Close the game before copying. There's also a script: `python scripts/sync_saves.py`
 
 ## What the mod tracks
 
