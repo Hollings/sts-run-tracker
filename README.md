@@ -95,6 +95,8 @@ cd web/frontend && npm run dev   # in another terminal
 
 Stale save/tracker files from previous game sessions are filtered out automatically using the mtime of the newest rotated `godot*.log`, so the dashboard shows "Waiting for Data" between runs instead of silently displaying a dead run. Set `STS2_PORT` / `STS2_BACKEND_PORT` to override port 8000 if it's taken.
 
+**Multiplayer guest limitation:** Only the host writes `current_run_mp.save` to disk — on a guest's machine the MP run state lives purely in memory and netcode, so there's nothing for the fallback to read. If you're a guest in a multiplayer run, you must enable the StS2Tracker mod to get a live dashboard; the mod reads in-memory game state directly and works for every client regardless of host status.
+
 This fallback only applies to the dev server. Production (the mod's embedded HTTP server on port 52323) always uses live tracker data.
 
 ## Known issues

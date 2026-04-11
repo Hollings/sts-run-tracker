@@ -53,6 +53,8 @@ Key pieces in `web/server/`:
 
 Stale-file detection: STS2 doesn't clean up `current_run*.save` or the tracker's JSON output when a run ends, so files from weeks-old runs can linger on disk. `merge.current_session_start_time()` returns the mtime of the newest archived `godot*.log` file (STS2 rotates `godot.log` on every session start), and any save/tracker file older than that is rejected as orphaned. This is what stops the dashboard from showing a dead run as if it were live.
 
+**MP guest limitation:** In multiplayer, only the host writes `current_run_mp.save` — guests never persist run state to disk (the run lives purely in netcode/RAM on their machine). This means the file-based fallback is structurally impossible for non-host clients: there's nothing to fall back to. Grepping the godot log for `Wrote.*bytes` on a guest MP session confirms only `progress.save`/`prefs.save`/`settings.save` ever touch disk. The StS2Tracker mod bypasses this entirely — it reads in-memory game state via Harmony hooks, which is fully populated on every client regardless of host status. So: guests playing MP **must** enable the mod to get a live dashboard.
+
 ### Decompile game assembly (for investigating new hooks)
 ```bash
 ilspycmd -t <FullTypeName> -r "<GameDir>\data_sts2_windows_x86_64" "<GameDir>\data_sts2_windows_x86_64\sts2.dll"
