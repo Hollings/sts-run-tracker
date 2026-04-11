@@ -22,11 +22,16 @@ async def watch_directory(
     callback: Callable[[dict[str, Any]], Coroutine],
     file_pattern: str = "*.json",
 ) -> None:
-    """Watch a directory for file changes and call the callback with parsed JSON.
+    """Watch a directory for file changes and invoke a callback.
+
+    The callback is always invoked for matching files, even if the file
+    could not be parsed as JSON (save files are often mid-write when
+    ``awatch`` fires). On parse failure the callback receives ``{}`` —
+    callers that need fresh state should re-read from disk themselves.
 
     Args:
         directory: Path to watch.
-        callback: Async function called with the parsed JSON content when a
+        callback: Async function called with parsed JSON (or ``{}``) when a
                   file matching *file_pattern* is created or modified.
         file_pattern: Glob pattern for files to watch (default ``*.json``).
     """
@@ -46,15 +51,25 @@ async def watch_directory(
             # Only care about created/modified files matching the pattern
             if change_type in (Change.added, Change.modified):
                 if changed.match(file_pattern) and changed.is_file():
-                    logger.info(
-                        "File %s: %s",
-                        "created" if change_type == Change.added else "modified",
-                        changed.name,
-                    )
                     try:
-                        data = _read_json(changed)
-                        if data is not None:
-                            await callback(data)
+                        # Best-effort JSON parse — save files may be
+                        # mid-write and unparseable. Callbacks that don't
+                        # need the payload still fire with an empty dict
+                        # so they can re-read from disk themselves.
+                        parsed = _read_json(changed)
+                        if parsed is not None:
+                            logger.info(
+                                "File %s: %s",
+                                "created" if change_type == Change.added else "modified",
+                                changed.name,
+                            )
+                        else:
+                            logger.debug(
+                                "File %s (unparseable, firing anyway): %s",
+                                "created" if change_type == Change.added else "modified",
+                                changed.name,
+                            )
+                        await callback(parsed or {})
                     except Exception:
                         logger.exception("Error processing %s", changed)
 

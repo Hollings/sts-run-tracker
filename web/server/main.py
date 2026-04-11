@@ -22,9 +22,11 @@ from models import (
 from watcher import watch_directory, get_latest_file, read_all_runs, read_progress, _read_json
 from merge import (
     merge_live_run,
-    load_current_run,
+    load_active_run,
     get_save_profile_dir,
     SAVE_DIR,
+    MODDED_SAVES,
+    UNMODDED_SAVES,
 )
 
 # ---------------------------------------------------------------------------
@@ -40,7 +42,6 @@ SAVES_BASE = os.environ.get(
     "STS2_SAVES_DIR",
     SAVE_DIR,  # from merge.py: Steam\userdata\...\remote
 )
-from merge import MODDED_SAVES, UNMODDED_SAVES
 
 
 def _get_active_saves_dir() -> str:
@@ -105,33 +106,55 @@ manager = ConnectionManager()
 _watcher_task: asyncio.Task | None = None
 
 
-async def _on_tracker_update(data: dict[str, Any]) -> None:
-    """Called by the file watcher when a tracker JSON changes."""
+async def _rebuild_and_broadcast(_data: dict[str, Any] | None = None) -> None:
+    """Rebuild merged live data from disk and broadcast to WS clients.
+
+    Used by both the tracker-dir watcher and the save-dir watcher so that
+    the server stays live even when the StS2Tracker mod is disabled. The
+    incoming ``_data`` arg (from the file-watch callback) is ignored — we
+    always reread the latest files via ``_build_merged_live`` to produce
+    a single source of truth.
+    """
+    merged = _build_merged_live()
+    if merged is None:
+        return
     logger.info("Broadcasting merged update to %d clients", len(manager._connections))
-    # Merge tracker data with the current save file before broadcasting
-    save = load_current_run()
-    merged = merge_live_run(data, save)
     await manager.broadcast({"type": "combat_update", "data": merged})
+
+
+_save_watcher_task: asyncio.Task | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _watcher_task
+    global _watcher_task, _save_watcher_task
     logger.info("Tracker dir : %s", TRACKER_DIR)
     logger.info("Saves dir   : %s", _get_active_saves_dir())
     logger.info("History dir : %s", _get_history_dir())
     logger.info("Progress    : %s", _get_progress_file())
 
+    # Watch the tracker dir (populated by the StS2Tracker mod when enabled)
     _watcher_task = asyncio.create_task(
-        watch_directory(TRACKER_DIR, _on_tracker_update, file_pattern="*.json")
+        watch_directory(TRACKER_DIR, _rebuild_and_broadcast, file_pattern="*.json")
+    )
+    # Also watch the active save dir so updates flow when the mod is disabled.
+    # The game writes current_run.save / current_run_mp.save on most state
+    # transitions, which is enough to drive a useful live view.
+    _save_watcher_task = asyncio.create_task(
+        watch_directory(
+            _get_active_saves_dir(),
+            _rebuild_and_broadcast,
+            file_pattern="current_run*.save",
+        )
     )
     yield
-    if _watcher_task:
-        _watcher_task.cancel()
-        try:
-            await _watcher_task
-        except asyncio.CancelledError:
-            pass
+    for task in (_watcher_task, _save_watcher_task):
+        if task:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
 
 # ---------------------------------------------------------------------------
@@ -155,10 +178,15 @@ app.add_middleware(
 
 
 def _build_merged_live() -> dict[str, Any] | None:
-    """Build merged live data from tracker + save file."""
+    """Build merged live data from tracker + active save file.
+
+    Uses ``load_active_run`` (no fallback to history) so that when there's
+    no run in progress the frontend shows "Waiting for Data" instead of
+    silently displaying the last completed run as if it were live.
+    """
     latest = get_latest_file(TRACKER_DIR, "*.json")
     tracker = _read_json(latest) if latest else None
-    save = load_current_run()
+    save = load_active_run()
     if tracker is None and save is None:
         return None
     return merge_live_run(tracker, save)

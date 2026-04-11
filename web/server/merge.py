@@ -122,21 +122,33 @@ def load_tracker(path: str) -> Optional[dict]:
 
 # --- Game save data ---
 
-def load_current_or_latest_run() -> Optional[dict]:
-    """Load active run, or fall back to the most recent completed run.
-    Prefers the most recently modified save between current_run.save and
-    current_run_mp.save (multiplayer uses a separate file)."""
+def load_active_run() -> Optional[dict]:
+    """Load the currently-active run save, or None if no run is in progress.
+
+    Checks both singleplayer (``current_run.save``) and multiplayer
+    (``current_run_mp.save``) and returns the most recently modified. Does
+    NOT fall back to history — use ``load_current_or_latest_run`` if you
+    want to show the last completed run as a fallback.
+    """
     save_dir = get_save_profile_dir()
-    # Check both singleplayer and multiplayer save files, prefer most recent
     candidates = []
     for name in ("current_run.save", "current_run_mp.save"):
         path = os.path.join(save_dir, name)
         if os.path.exists(path):
             candidates.append(path)
-    if candidates:
-        best = max(candidates, key=os.path.getmtime)
-        return load_json(best)
+    if not candidates:
+        return None
+    best = max(candidates, key=os.path.getmtime)
+    return load_json(best)
+
+
+def load_current_or_latest_run() -> Optional[dict]:
+    """Load active run, or fall back to the most recent completed run."""
+    active = load_active_run()
+    if active is not None:
+        return active
     # No active run - load the latest completed run from history
+    save_dir = get_save_profile_dir()
     history_dir = os.path.join(save_dir, "history")
     if os.path.isdir(history_dir):
         runs = sorted(glob.glob(os.path.join(history_dir, "*.run")),
@@ -225,23 +237,28 @@ def merge_live_run(tracker: Optional[dict], save: Optional[dict]) -> dict:
 
     matched_combats: set[int] = set()
 
-    # Run info from tracker
-    if tracker:
-        result["run_info"] = tracker.get("run_info", {})
-        result["combats"] = tracker.get("combats", [])
-
-    # Discard save data if it belongs to a different run (stale save file)
+    # Discard stale tracker data if it belongs to a different run than the
+    # save file. The save file is the authoritative source for "what run is
+    # currently active" — if the StS2Tracker mod is disabled or hasn't
+    # written a file for the current run yet, we'd otherwise show combat
+    # data for an old run alongside the current save's map/floors.
     if save and tracker:
         tracker_seed = tracker.get("run_info", {}).get("seed", "")
         save_seed = save.get("seed", "")
         if tracker_seed and save_seed and tracker_seed != save_seed:
-            save = None
+            tracker = None
         elif tracker_seed and not save_seed:
-            # Save has no seed (e.g. old MP save with null seed) - check timestamps
+            # MP saves store seed as null; fall back to comparing start times
             tracker_start = tracker.get("run_info", {}).get("start_time", 0)
             save_start = save.get("start_time", 0)
             if tracker_start and save_start and abs(tracker_start - save_start) > 3600:
-                save = None
+                tracker = None
+
+    # Run info from tracker (after seed-mismatch check so we don't import
+    # stale combat data from a different run)
+    if tracker:
+        result["run_info"] = tracker.get("run_info", {})
+        result["combats"] = tracker.get("combats", [])
 
     # Build floor timeline from save
     if save:
