@@ -41,6 +41,18 @@ cd web/server && python -m uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 Do NOT use `--reload` flag - it spawns child processes that become zombies on Windows. This server is only needed for frontend development with hot reload. In production, the mod serves everything.
 
+Port collision override: the default is 8000 to match `docker-compose.yml`. If something else is already on 8000, set `STS2_PORT=<port>` when launching the server and `STS2_BACKEND_PORT=<port>` when launching Vite so the proxy matches.
+
+### Dev server file-based fallback
+The dev server normally gets its combat data from JSON files written by the C# mod's `CombatTracker` to `%APPDATA%/SlayTheSpire2/tracker/`. When the mod is disabled (or hasn't loaded yet, or was never enabled in the first place), it falls back to reading directly from the game's own `current_run.save` / `current_run_mp.save` files. You lose per-combat detail (damage charts, card play sequences) since those are mod-tracked, but the dashboard still shows the map, floor history, card/relic choices, and per-floor HP/gold from whatever the game has autosaved.
+
+Key pieces in `web/server/`:
+- `main.py` — `_build_merged_live()` is the single entry point both watchers go through. There are two `watch_directory` tasks running in `lifespan`: one on the tracker dir, one on `get_save_profile_dir()` matching `current_run*.save`. Both fire `_rebuild_and_broadcast()`, which re-reads from disk.
+- `merge.py` — `load_active_run()` (no history fallback) for the live view; `load_current_or_latest_run()` keeps the old history-fallback behavior for any REST callers. `merge_live_run()` discards the stale tracker (not the save) when their seeds mismatch.
+- `watcher.py` — `watch_directory` now fires the callback even on JSON parse failure (save files are often mid-write when `awatch` reports a change); callers re-read from disk themselves.
+
+Stale-file detection: STS2 doesn't clean up `current_run*.save` or the tracker's JSON output when a run ends, so files from weeks-old runs can linger on disk. `merge.current_session_start_time()` returns the mtime of the newest archived `godot*.log` file (STS2 rotates `godot.log` on every session start), and any save/tracker file older than that is rejected as orphaned. This is what stops the dashboard from showing a dead run as if it were live.
+
 ### Decompile game assembly (for investigating new hooks)
 ```bash
 ilspycmd -t <FullTypeName> -r "<GameDir>\data_sts2_windows_x86_64" "<GameDir>\data_sts2_windows_x86_64\sts2.dll"

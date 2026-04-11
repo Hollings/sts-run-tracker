@@ -81,6 +81,22 @@ cd web/frontend && npm install && npm run build
 
 Deploy `StS2Tracker/bin/StS2Tracker.dll` to `<game>/mods/StS2Tracker/` and copy `web/frontend/dist/` contents to `<game>/mods/StS2Tracker/web/`.
 
+### Dev server (frontend hot reload)
+
+For frontend work there's an optional Python dev server under `web/server/` that Vite proxies to. It reads directly from the game's save files, so **the dashboard works even if the StS2Tracker mod is disabled or not installed** — you lose per-combat detail (damage charts, card play sequences from in-memory combat tracking), but the map, floor history, card/relic choices, and per-floor HP/gold all still populate from whatever the game has autosaved.
+
+When the mod *is* running, the dev server merges its live tracker JSON on top of the save data for the full experience. When it isn't, the save file alone drives the view.
+
+```bash
+pip install fastapi uvicorn watchfiles websockets pydantic
+cd web/server && python -m uvicorn main:app --host 0.0.0.0 --port 8000
+cd web/frontend && npm run dev   # in another terminal
+```
+
+Stale save/tracker files from previous game sessions are filtered out automatically using the mtime of the newest rotated `godot*.log`, so the dashboard shows "Waiting for Data" between runs instead of silently displaying a dead run. Set `STS2_PORT` / `STS2_BACKEND_PORT` to override port 8000 if it's taken.
+
+This fallback only applies to the dev server. Production (the mod's embedded HTTP server on port 52323) always uses live tracker data.
+
 ## Known issues
 
 - **Multiplayer victory summary**: The top-5 damage cards shown per player are aggregated across all players instead of being per-player.
