@@ -122,6 +122,38 @@ def load_tracker(path: str) -> Optional[dict]:
 
 # --- Game save data ---
 
+LOGS_DIR = os.environ.get(
+    "STS2_LOGS_DIR",
+    os.path.join(os.environ.get("APPDATA", ""), "SlayTheSpire2", "logs"),
+)
+
+
+def current_session_start_time() -> Optional[float]:
+    """Best-effort estimate of when the current STS2 game session started.
+
+    STS2 rotates its log file on startup: the previous session's
+    ``godot.log`` gets renamed to ``godot<ISO-timestamp>.log`` and a fresh
+    ``godot.log`` is created. That means the mtime of the newest archived
+    ``godot*.log`` file is approximately when the current session began.
+
+    Returns the unix timestamp, or None if the logs directory is missing
+    or contains no archived logs (first-ever launch, or logs pruned).
+    """
+    if not os.path.isdir(LOGS_DIR):
+        return None
+    archived = [
+        os.path.join(LOGS_DIR, f)
+        for f in os.listdir(LOGS_DIR)
+        if f.startswith("godot") and f.endswith(".log") and f != "godot.log"
+    ]
+    if not archived:
+        return None
+    try:
+        return max(os.path.getmtime(p) for p in archived)
+    except OSError:
+        return None
+
+
 def load_active_run() -> Optional[dict]:
     """Load the currently-active run save, or None if no run is in progress.
 
@@ -129,6 +161,12 @@ def load_active_run() -> Optional[dict]:
     (``current_run_mp.save``) and returns the most recently modified. Does
     NOT fall back to history — use ``load_current_or_latest_run`` if you
     want to show the last completed run as a fallback.
+
+    Save files that predate the current game session are rejected — STS2
+    doesn't always clean up ``current_run*.save`` between runs, so an
+    orphaned file from a previous session can linger for days. We detect
+    this by comparing the save's mtime against the log-file-derived
+    session start time; if the save is older, it's from a dead run.
     """
     save_dir = get_save_profile_dir()
     candidates = []
@@ -139,6 +177,12 @@ def load_active_run() -> Optional[dict]:
     if not candidates:
         return None
     best = max(candidates, key=os.path.getmtime)
+
+    session_start = current_session_start_time()
+    if session_start is not None and os.path.getmtime(best) < session_start:
+        # Save is from a previous game session — treat as no active run
+        return None
+
     return load_json(best)
 
 

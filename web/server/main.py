@@ -24,6 +24,7 @@ from merge import (
     merge_live_run,
     load_active_run,
     get_save_profile_dir,
+    current_session_start_time,
     SAVE_DIR,
     MODDED_SAVES,
     UNMODDED_SAVES,
@@ -182,9 +183,16 @@ def _build_merged_live() -> dict[str, Any] | None:
 
     Uses ``load_active_run`` (no fallback to history) so that when there's
     no run in progress the frontend shows "Waiting for Data" instead of
-    silently displaying the last completed run as if it were live.
+    silently displaying the last completed run as if it were live. Stale
+    tracker JSON files from previous game sessions are also filtered out
+    (STS2Tracker doesn't clean up its output between runs).
     """
     latest = get_latest_file(TRACKER_DIR, "*.json")
+    if latest is not None:
+        session_start = current_session_start_time()
+        if session_start is not None and os.path.getmtime(latest) < session_start:
+            # Tracker file is from a previous game session
+            latest = None
     tracker = _read_json(latest) if latest else None
     save = load_active_run()
     if tracker is None and save is None:
