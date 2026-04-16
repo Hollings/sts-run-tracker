@@ -5,6 +5,7 @@ import LiveRun from "./pages/LiveRun";
 import RunHistory from "./pages/RunHistory";
 import RunDetail from "./pages/RunDetail";
 import Stats from "./pages/Stats";
+import RunStats from "./pages/RunStats";
 import { useWebSocket } from "./hooks/useWebSocket";
 
 export default function App() {
@@ -16,6 +17,7 @@ export default function App() {
       <main>
         <Routes>
           <Route path="/" element={<LiveRun data={data} />} />
+          <Route path="/run-stats" element={<RunStats data={data} />} />
           <Route path="/history" element={<RunHistory />} />
           <Route path="/history/:filename" element={<RunDetail />} />
           <Route path="/stats" element={<Stats />} />

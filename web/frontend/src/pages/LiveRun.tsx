@@ -9,6 +9,8 @@ import type {
 } from "../utils/types";
 import { formatGameId } from "../utils/format";
 import DamageChart from "../components/DamageChart";
+import DamagePerFloorChart from "../components/DamagePerFloorChart";
+import AvgDamagePerTurnChart from "../components/AvgDamagePerTurnChart";
 
 interface Props {
   data: MergedLiveData | null;
@@ -452,6 +454,21 @@ function RunSummaryView({ data, onClose }: { data: MergedLiveData; onClose: () =
             </div>
           );
         })}
+      </div>
+
+      {/* Run aggregate charts */}
+      <div className="bg-sts-surface border border-sts-border rounded-lg p-4 shrink-0">
+        <h3 className="text-sm font-semibold text-sts-gold mb-3">
+          Damage per Combat
+        </h3>
+        <DamagePerFloorChart data={data} />
+      </div>
+
+      <div className="bg-sts-surface border border-sts-border rounded-lg p-4 shrink-0">
+        <h3 className="text-sm font-semibold text-sts-gold mb-3">
+          Average Damage per Turn
+        </h3>
+        <AvgDamagePerTurnChart data={data} />
       </div>
     </div>
   );

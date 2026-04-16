@@ -71,6 +71,22 @@ export function roomTypeColor(roomType: string): string {
 }
 
 /**
+ * Get a hex color for floor types (for SVG/chart elements that can't use Tailwind classes).
+ */
+export function floorTypeHexColor(type: string): string {
+  switch (type) {
+    case "monster": return "#e05550";
+    case "elite": return "#d4943a";
+    case "boss": return "#c47aa0";
+    case "ancient": return "#a07ac0";
+    case "rest_site": return "#5aaa6a";
+    case "treasure": return "#c4b888";
+    case "shop": return "#5aaa8a";
+    default: return "#776754";
+  }
+}
+
+/**
  * Get a background color class for room/floor types.
  */
 export function roomTypeBg(roomType: string): string {

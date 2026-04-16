@@ -3,8 +3,9 @@ import { Link, useLocation } from "react-router-dom";
 
 const NAV_ITEMS = [
   { path: "/", label: "Live Run" },
+  { path: "/run-stats", label: "Run Stats" },
   { path: "/history", label: "Run History" },
-  { path: "/stats", label: "Stats" },
+  { path: "/stats", label: "Lifetime Stats" },
 ];
 
 interface Props {
