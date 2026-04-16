@@ -12,7 +12,7 @@ import {
 import type { MergedLiveData } from "../utils/types";
 import { formatGameId, floorTypeHexColor } from "../utils/format";
 import {
-  damagePerCombatFloor,
+  avgTurnDamagePerCombat,
   getPlayerIds,
   getPlayerCharacter,
   playerColor,
@@ -64,16 +64,19 @@ function FloorTooltip({ active, payload, label, chartData, pids, data }: any) {
         const val = point?.[pid] ?? 0;
         return (
           <div key={pid} style={{ color: playerColor(i) }}>
-            {formatGameId(getPlayerCharacter(data, pid))}: {val}
+            {formatGameId(getPlayerCharacter(data, pid))}: {val} avg/turn
           </div>
         );
       })}
+      <div style={{ fontSize: 11, color: "#776754", marginTop: 2 }}>
+        {point?.turns ?? 0} turn{(point?.turns ?? 0) !== 1 ? "s" : ""}
+      </div>
     </div>
   );
 }
 
 export default function DamagePerFloorChart({ data }: Props) {
-  const chartData = damagePerCombatFloor(data);
+  const chartData = avgTurnDamagePerCombat(data);
   const pids = getPlayerIds(data);
 
   if (chartData.length === 0) {

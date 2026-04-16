@@ -55,10 +55,10 @@ export default function RunStats({ data }: Props) {
       {/* Damage per combat floor */}
       <div className="bg-sts-surface border border-sts-border rounded-lg p-4">
         <h2 className="text-sm font-semibold text-sts-gold mb-3">
-          Damage per Combat
+          Avg Turn Damage per Combat
         </h2>
         <p className="text-xs text-sts-gold-dim mb-2">
-          Total damage dealt each combat floor
+          Average damage dealt per turn in each combat
         </p>
         <DamagePerFloorChart data={data} />
       </div>

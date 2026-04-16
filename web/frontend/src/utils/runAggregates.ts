@@ -35,7 +35,7 @@ export interface DamagePerFloorPoint {
   [key: string]: string | number;
 }
 
-export function damagePerCombatFloor(
+export function avgTurnDamagePerCombat(
   data: MergedLiveData,
 ): DamagePerFloorPoint[] {
   const pids = getPlayerIds(data);
@@ -43,14 +43,16 @@ export function damagePerCombatFloor(
 
   for (const floor of data.floors) {
     if (!floor.combat) continue;
+    const turns = floor.combat.total_turns || 1;
     const point: DamagePerFloorPoint = {
       floor: floor.floor,
       type: floor.type,
       encounter: floor.room_id || floor.type,
+      turns,
     };
     for (const pid of pids) {
       const stats = floor.combat.players[pid];
-      point[pid] = stats?.damage_dealt ?? 0;
+      point[pid] = stats ? Math.round(stats.damage_dealt / turns) : 0;
     }
     points.push(point);
   }

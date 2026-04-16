@@ -459,7 +459,7 @@ function RunSummaryView({ data, onClose }: { data: MergedLiveData; onClose: () =
       {/* Run aggregate charts */}
       <div className="bg-sts-surface border border-sts-border rounded-lg p-4 shrink-0">
         <h3 className="text-sm font-semibold text-sts-gold mb-3">
-          Damage per Combat
+          Avg Turn Damage per Combat
         </h3>
         <DamagePerFloorChart data={data} />
       </div>
