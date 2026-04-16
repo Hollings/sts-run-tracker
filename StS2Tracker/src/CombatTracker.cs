@@ -53,7 +53,6 @@ public static class CombatTracker
         _playerTurns.Clear();
         _runInfo = null;
         _outputPath = null;
-        OnDataChanged = null;
         ModEntry.Log("CombatTracker initialized. Output dir: " + _outputDir);
     }
 
