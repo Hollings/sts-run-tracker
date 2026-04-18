@@ -72,21 +72,22 @@ public static class CombatTracker
             _playerTurns.Clear();
             _dotAppliers.Clear();
 
-            // Detect new run: if the seed changed, reinitialize everything
+            // Detect new run: if the seed changed, reinitialize everything.
+            // Skip reset if we can't read the current seed (null RNG during boss fights, etc.)
             if (runState != null && _runInfo != null)
             {
-                string currentSeed = runState.Rng?.StringSeed ?? "unknown";
-                if (currentSeed != _runInfo.Seed)
+                string? currentSeed = runState.Rng?.StringSeed;
+                if (currentSeed != null && currentSeed != _runInfo.Seed)
                 {
                     ModEntry.Log($"New run detected (seed changed: {_runInfo.Seed} -> {currentSeed}). Resetting tracker.");
                     Initialize();
                 }
             }
 
-            // Capture run info once on first combat
-            if (_runInfo == null && runState != null)
+            // Capture run info once on first combat (skip if seed unreadable)
+            if (_runInfo == null && runState != null && runState.Rng?.StringSeed != null)
             {
-                string seed = runState.Rng?.StringSeed ?? "unknown";
+                string seed = runState.Rng.StringSeed;
                 long startTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
                 _runInfo = new RunInfo
