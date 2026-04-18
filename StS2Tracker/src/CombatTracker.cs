@@ -26,8 +26,8 @@ public static class CombatTracker
     private static RunInfo? _runInfo;
     private static string? _outputPath;
     private static readonly string _outputDir;
-    // Maps enemy ModelId -> player ID who last applied a power to it (for DoT attribution)
-    private static readonly Dictionary<string, string> _dotAppliers = new();
+    // Maps enemy ModelId -> { player ID -> cumulative stacks applied } for DoT damage attribution
+    private static readonly Dictionary<string, Dictionary<string, int>> _dotAppliers = new();
 
     /// <summary>
     /// Fired after any state change. WebSocketManager registers a handler
@@ -238,45 +238,37 @@ public static class CombatTracker
 
             // Attribute damage to the dealer's player
             string? dealerPid = GetPlayerId(dealer);
-
-            // DoT damage (poison, etc.): dealer is null/non-player but target is an enemy
-            if (dealerPid == null && !target.IsPlayer)
-            {
-                string targetKey = target.ModelId.ToString();
-                if (_dotAppliers.TryGetValue(targetKey, out var applierPid))
-                    dealerPid = applierPid;
-                else if (_current.Players.Count == 1)
-                    dealerPid = _current.Players.Keys.First();
-            }
+            string tgtKey = target.ModelId.ToString();
+            string cardKey = cardSource?.Id.ToString() ?? "_non_card";
 
             if (dealerPid != null && _current.Players.TryGetValue(dealerPid, out var dealerStats))
             {
-                dealerStats.DamageDealt += result.TotalDamage;
-
-                // Per-turn tracking
-                EnsureTurnEntry(dealerStats);
-                dealerStats.DamagePerTurn[^1] += result.TotalDamage;
-
-                // Per-target tracking
-                string targetKey = target.ModelId.ToString();
-                if (!dealerStats.DamageByTarget.ContainsKey(targetKey))
-                    dealerStats.DamageByTarget[targetKey] = 0;
-                dealerStats.DamageByTarget[targetKey] += result.TotalDamage;
-
-                // Per-card damage tracking
-                string cardKey = cardSource?.Id.ToString() ?? "_non_card";
-                if (!dealerStats.DamageByCard.ContainsKey(cardKey))
-                    dealerStats.DamageByCard[cardKey] = new CardDamageStats();
-                var cardStats = dealerStats.DamageByCard[cardKey];
-                cardStats.TotalDamage += result.TotalDamage;
-                cardStats.Hits++;
-                if (result.TotalDamage > cardStats.MaxHit)
-                    cardStats.MaxHit = result.TotalDamage;
-                if (result.WasTargetKilled)
-                    cardStats.Kills++;
-
-                if (result.WasTargetKilled)
-                    dealerStats.Kills++;
+                RecordDamageDealt(dealerStats, result.TotalDamage, tgtKey, cardKey, result.WasTargetKilled);
+            }
+            else if (!target.IsPlayer)
+            {
+                // DoT damage (poison, etc.): split proportionally among players who applied powers
+                if (_dotAppliers.TryGetValue(tgtKey, out var appliers) && appliers.Count > 0)
+                {
+                    int totalStacks = appliers.Values.Sum();
+                    int damageLeft = result.TotalDamage;
+                    int i = 0;
+                    foreach (var (pid, stacks) in appliers)
+                    {
+                        i++;
+                        int share = i < appliers.Count
+                            ? (int)Math.Round((double)stacks / totalStacks * result.TotalDamage)
+                            : damageLeft;
+                        damageLeft -= share;
+                        if (share > 0 && _current.Players.TryGetValue(pid, out var pStats))
+                            RecordDamageDealt(pStats, share, tgtKey, cardKey, result.WasTargetKilled && i == appliers.Count);
+                    }
+                }
+                else if (_current.Players.Count == 1)
+                {
+                    var soloStats = _current.Players.Values.First();
+                    RecordDamageDealt(soloStats, result.TotalDamage, tgtKey, cardKey, result.WasTargetKilled);
+                }
             }
 
             // Track damage received by target player
@@ -389,8 +381,14 @@ public static class CombatTracker
 
             // Track who applied powers to enemies (for DoT damage attribution)
             string? applierPid = GetPlayerId(applier);
-            if (applierPid != null && !target.IsPlayer)
-                _dotAppliers[targetId] = applierPid;
+            if (applierPid != null && !target.IsPlayer && amount > 0)
+            {
+                if (!_dotAppliers.ContainsKey(targetId))
+                    _dotAppliers[targetId] = new Dictionary<string, int>();
+                if (!_dotAppliers[targetId].ContainsKey(applierPid))
+                    _dotAppliers[targetId][applierPid] = 0;
+                _dotAppliers[targetId][applierPid] += amount;
+            }
 
             if (applierPid != null && _current.Players.TryGetValue(applierPid, out var applierStats))
             {
@@ -481,6 +479,31 @@ public static class CombatTracker
             RunInfo = _runInfo,
             Combats = _combats.ToList(),  // shallow copy to isolate from future mutations
         };
+    }
+
+    private static void RecordDamageDealt(PlayerCombatStats stats, int damage, string targetKey, string cardKey, bool killedTarget)
+    {
+        stats.DamageDealt += damage;
+
+        EnsureTurnEntry(stats);
+        stats.DamagePerTurn[^1] += damage;
+
+        if (!stats.DamageByTarget.ContainsKey(targetKey))
+            stats.DamageByTarget[targetKey] = 0;
+        stats.DamageByTarget[targetKey] += damage;
+
+        if (!stats.DamageByCard.ContainsKey(cardKey))
+            stats.DamageByCard[cardKey] = new CardDamageStats();
+        var cardStats = stats.DamageByCard[cardKey];
+        cardStats.TotalDamage += damage;
+        cardStats.Hits++;
+        if (damage > cardStats.MaxHit)
+            cardStats.MaxHit = damage;
+        if (killedTarget)
+        {
+            cardStats.Kills++;
+            stats.Kills++;
+        }
     }
 
     private static string? GetPlayerId(Creature? creature)
