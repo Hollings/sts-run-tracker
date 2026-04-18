@@ -26,6 +26,8 @@ public static class CombatTracker
     private static RunInfo? _runInfo;
     private static string? _outputPath;
     private static readonly string _outputDir;
+    // Maps enemy ModelId -> player ID who last applied a power to it (for DoT attribution)
+    private static readonly Dictionary<string, string> _dotAppliers = new();
 
     /// <summary>
     /// Fired after any state change. WebSocketManager registers a handler
@@ -51,6 +53,7 @@ public static class CombatTracker
         _current = null;
         _turnNumber = 0;
         _playerTurns.Clear();
+        _dotAppliers.Clear();
         _runInfo = null;
         _outputPath = null;
         ModEntry.Log("CombatTracker initialized. Output dir: " + _outputDir);
@@ -67,6 +70,7 @@ public static class CombatTracker
         {
             _turnNumber = 0;
             _playerTurns.Clear();
+            _dotAppliers.Clear();
 
             // Detect new run: if the seed changed, reinitialize everything
             if (runState != null && _runInfo != null)
@@ -234,6 +238,17 @@ public static class CombatTracker
 
             // Attribute damage to the dealer's player
             string? dealerPid = GetPlayerId(dealer);
+
+            // DoT damage (poison, etc.): dealer is null/non-player but target is an enemy
+            if (dealerPid == null && !target.IsPlayer)
+            {
+                string targetKey = target.ModelId.ToString();
+                if (_dotAppliers.TryGetValue(targetKey, out var applierPid))
+                    dealerPid = applierPid;
+                else if (_current.Players.Count == 1)
+                    dealerPid = _current.Players.Keys.First();
+            }
+
             if (dealerPid != null && _current.Players.TryGetValue(dealerPid, out var dealerStats))
             {
                 dealerStats.DamageDealt += result.TotalDamage;
@@ -372,8 +387,11 @@ public static class CombatTracker
             string targetId = target.ModelId.ToString();
             string? applierId = applier?.ModelId.ToString();
 
-            // Track on the applier player (buffs/debuffs they caused)
+            // Track who applied powers to enemies (for DoT damage attribution)
             string? applierPid = GetPlayerId(applier);
+            if (applierPid != null && !target.IsPlayer)
+                _dotAppliers[targetId] = applierPid;
+
             if (applierPid != null && _current.Players.TryGetValue(applierPid, out var applierStats))
             {
                 if (!applierStats.PowersApplied.ContainsKey(powerId))
