@@ -255,8 +255,9 @@ def list_runs() -> list[dict[str, Any]]:
 
 @app.get("/api/runs/{filename}")
 def get_run_detail(filename: str) -> dict[str, Any]:
-    """Return full run data for a specific save file (checks both save dirs)."""
-    # Search both modded and unmodded history directories
+    """Return merged MergedLiveData + historical metadata for a specific run."""
+    from merge import merge_historical_run
+
     for history_dir in [
         os.path.join(MODDED_SAVES, "history"),
         os.path.join(UNMODDED_SAVES, "history"),
@@ -266,7 +267,7 @@ def get_run_detail(filename: str) -> dict[str, Any]:
             data = _read_json(filepath)
             if data is None:
                 raise HTTPException(status_code=500, detail="Failed to read run data")
-            return data
+            return merge_historical_run(data)
     raise HTTPException(status_code=404, detail="Run not found")
 
 

@@ -86,6 +86,73 @@ export function floorTypeHexColor(type: string): string {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Floor type helpers (used by LiveRun, RunDetail, sidebar, etc.)
+// ---------------------------------------------------------------------------
+
+export const FLOOR_TYPE_LABELS: Record<string, string> = {
+  monster: "Monster",
+  elite: "Elite",
+  boss: "Boss",
+  ancient: "Ancient",
+  unknown: "Event",
+  rest_site: "Rest",
+  treasure: "Treasure",
+  shop: "Shop",
+  event: "Event",
+};
+
+export const FLOOR_TYPE_ICONS: Record<string, string> = {
+  monster: "M",
+  elite: "E",
+  boss: "B",
+  ancient: "A",
+  unknown: "?",
+  rest_site: "R",
+  treasure: "T",
+  shop: "$",
+  event: "?",
+};
+
+export function floorTypeBorderColor(type: string): string {
+  switch (type) {
+    case "monster": return "border-[#8B1913]/50";
+    case "elite": return "border-[#a86830]/50";
+    case "boss": return "border-[#7a3a5a]/50";
+    case "ancient": return "border-[#6a4a7a]/50";
+    case "rest_site": return "border-[#3a6a4a]/50";
+    case "treasure": return "border-[#776754]/50";
+    case "shop": return "border-[#3a6a5a]/50";
+    default: return "border-sts-border";
+  }
+}
+
+export function floorTypeBgColor(type: string): string {
+  switch (type) {
+    case "monster": return "bg-[#8B1913]/15";
+    case "elite": return "bg-[#a86830]/15";
+    case "boss": return "bg-[#7a3a5a]/15";
+    case "ancient": return "bg-[#6a4a7a]/15";
+    case "rest_site": return "bg-[#3a6a4a]/15";
+    case "treasure": return "bg-[#776754]/15";
+    case "shop": return "bg-[#3a6a5a]/15";
+    default: return "bg-sts-card/30";
+  }
+}
+
+export function floorTypeTextColor(type: string): string {
+  switch (type) {
+    case "monster": return "text-[#e05550]";
+    case "elite": return "text-[#d4943a]";
+    case "boss": return "text-[#c47aa0]";
+    case "ancient": return "text-[#a07ac0]";
+    case "rest_site": return "text-[#5aaa6a]";
+    case "treasure": return "text-[#c4b888]";
+    case "shop": return "text-[#5aaa8a]";
+    default: return "text-sts-text";
+  }
+}
+
 /**
  * Get a background color class for room/floor types.
  */

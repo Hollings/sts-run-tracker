@@ -300,6 +300,35 @@ export interface MergedLiveData {
 }
 
 // ---------------------------------------------------------------------------
+// Historical run detail (MergedLiveData + historical metadata)
+// ---------------------------------------------------------------------------
+
+export interface HistoricalPlayerFinal {
+  character: string;
+  id: string;
+  deck: { id: string; current_upgrade_level: number; floor_added_to_deck: number }[];
+  relics: { id: string }[];
+  potions: { id: string }[];
+  max_potion_slot_count: number;
+}
+
+export interface HistoricalMetadata {
+  win: boolean;
+  was_abandoned: boolean;
+  run_time: number;
+  start_time: number;
+  killed_by_encounter: string;
+  killed_by_event: string;
+  game_mode: string;
+  has_tracker_data: boolean;
+  players_final: HistoricalPlayerFinal[];
+}
+
+export interface HistoricalRunData extends MergedLiveData {
+  historical: HistoricalMetadata;
+}
+
+// ---------------------------------------------------------------------------
 // WebSocket message
 // ---------------------------------------------------------------------------
 

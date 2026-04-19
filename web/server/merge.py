@@ -116,6 +116,25 @@ def get_all_tracker_files() -> list[str]:
                   key=os.path.getmtime, reverse=True)
 
 
+def find_tracker_for_seed(seed: str, start_time: int = 0) -> Optional[str]:
+    """Find the tracker JSON matching a given seed, closest to start_time."""
+    if not seed or not os.path.isdir(TRACKER_DIR):
+        return None
+    matches = glob.glob(os.path.join(TRACKER_DIR, f"{seed}_*.json"))
+    if not matches:
+        return None
+    if len(matches) == 1 or start_time <= 0:
+        return matches[0]
+    def ts_distance(path: str) -> int:
+        name = os.path.splitext(os.path.basename(path))[0]
+        suffix = name[len(seed) + 1:]
+        try:
+            return abs(int(suffix) - start_time)
+        except ValueError:
+            return 999999999
+    return min(matches, key=ts_distance)
+
+
 def load_tracker(path: str) -> Optional[dict]:
     return load_json(path)
 
@@ -565,3 +584,56 @@ def _compute_run_totals(combats: list[dict]) -> dict:
         "losses": sum(1 for c in combats if c.get("result") == "loss"),
         "players": player_totals,
     }
+
+
+def merge_historical_run(save: dict) -> dict:
+    """Merge a historical .run save with its tracker data (if available).
+
+    Returns MergedLiveData format enriched with historical metadata
+    (win, killed_by, run_time, final deck/relics/potions).
+    """
+    seed = save.get("seed", "")
+    start_time = save.get("start_time", 0)
+
+    tracker = None
+    tracker_path = find_tracker_for_seed(seed, start_time)
+    if tracker_path:
+        tracker = load_tracker(tracker_path)
+
+    merged = merge_live_run(tracker, save)
+
+    players_final = []
+    for p in save.get("players", []):
+        pf = {
+            "character": p.get("character", ""),
+            "id": str(p.get("id", "")),
+            "deck": [
+                {
+                    "id": short_id(c.get("id", "")),
+                    "current_upgrade_level": c.get("current_upgrade_level", 0),
+                    "floor_added_to_deck": c.get("floor_added_to_deck", 0),
+                }
+                for c in p.get("deck", [])
+            ],
+            "relics": [{"id": short_id(r.get("id", ""))} for r in p.get("relics", [])],
+            "potions": [{"id": short_id(pot.get("id", ""))} for pot in p.get("potions", [])],
+            "max_potion_slot_count": p.get("max_potion_slot_count", 0),
+        }
+        players_final.append(pf)
+
+    killed_by_enc = save.get("killed_by_encounter", "")
+    killed_by_evt = save.get("killed_by_event", "")
+
+    merged["historical"] = {
+        "win": save.get("win", False),
+        "was_abandoned": save.get("was_abandoned", False),
+        "run_time": save.get("run_time", 0),
+        "start_time": save.get("start_time", 0),
+        "killed_by_encounter": killed_by_enc,
+        "killed_by_event": killed_by_evt,
+        "game_mode": save.get("game_mode", "standard"),
+        "has_tracker_data": tracker is not None,
+        "players_final": players_final,
+    }
+
+    return merged

@@ -261,6 +261,66 @@ public static class SaveFileReader
     }
 
     /// <summary>
+    /// Find tracker JSON files matching a given seed in the tracker output directory.
+    /// Returns files sorted by start_time proximity to the given startTime (closest first).
+    /// </summary>
+    public static List<string> FindTrackerFilesForSeed(string seed, long startTime = 0)
+    {
+        var trackerDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "SlayTheSpire2", "tracker");
+
+        if (!Directory.Exists(trackerDir))
+            return new List<string>();
+
+        try
+        {
+            var matches = Directory.GetFiles(trackerDir, seed + "_*.json")
+                .ToList();
+
+            if (matches.Count <= 1 || startTime <= 0)
+                return matches;
+
+            matches.Sort((a, b) =>
+            {
+                long tsA = ExtractTimestamp(Path.GetFileNameWithoutExtension(a), seed);
+                long tsB = ExtractTimestamp(Path.GetFileNameWithoutExtension(b), seed);
+                return Math.Abs(tsA - startTime).CompareTo(Math.Abs(tsB - startTime));
+            });
+
+            return matches;
+        }
+        catch (Exception ex)
+        {
+            ModEntry.Log("SaveFileReader: error scanning tracker dir: " + ex.Message);
+            return new List<string>();
+        }
+    }
+
+    private static long ExtractTimestamp(string filename, string seed)
+    {
+        var suffix = filename.Substring(seed.Length + 1);
+        return long.TryParse(suffix, out var ts) ? ts : 0;
+    }
+
+    /// <summary>
+    /// Load a tracker JSON file and deserialize it into RunTrackerData.
+    /// </summary>
+    public static RunTrackerData? LoadTrackerFile(string path)
+    {
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            return JsonSerializer.Deserialize<RunTrackerData>(stream);
+        }
+        catch (Exception ex)
+        {
+            ModEntry.Log("SaveFileReader: error loading tracker file " + path + ": " + ex.Message);
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Return both modded and unmodded history directories that exist on disk.
     /// </summary>
     private static List<string> GetHistoryDirs()

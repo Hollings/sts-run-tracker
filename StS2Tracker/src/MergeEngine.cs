@@ -257,6 +257,105 @@ public static class MergeEngine
     }
 
     // -----------------------------------------------------------------------
+    // MergeHistoricalRun: merge tracker + save, add historical metadata
+    // -----------------------------------------------------------------------
+
+    public static string MergeHistoricalRun(
+        RunTrackerData? tracker,
+        Dictionary<string, JsonElement> save)
+    {
+        string mergedJson = MergeLiveRun(tracker, save);
+        using var mergedDoc = JsonDocument.Parse(mergedJson);
+        var root = mergedDoc.RootElement;
+
+        var result = new Dictionary<string, object?>();
+        foreach (var prop in root.EnumerateObject())
+            result[prop.Name] = prop.Value.Clone();
+
+        // Add historical metadata that MergedLiveData doesn't include
+        var hist = new Dictionary<string, object?>
+        {
+            ["win"] = GetBool(save, "win"),
+            ["was_abandoned"] = GetBool(save, "was_abandoned"),
+            ["run_time"] = GetLong(save, "run_time"),
+            ["start_time"] = GetLong(save, "start_time"),
+            ["killed_by_encounter"] = GetString(save, "killed_by_encounter"),
+            ["killed_by_event"] = GetString(save, "killed_by_event"),
+            ["game_mode"] = GetStringOrDefault(save, "game_mode", "standard"),
+            ["has_tracker_data"] = tracker != null,
+        };
+
+        // Final deck, relics, potions per player
+        var playersFinal = new List<Dictionary<string, object?>>();
+        if (save.TryGetValue("players", out var playersEl)
+            && playersEl.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var p in playersEl.EnumerateArray())
+            {
+                var pf = new Dictionary<string, object?>
+                {
+                    ["character"] = p.TryGetProperty("character", out var ch) ? ch.GetString() ?? "" : "",
+                    ["id"] = GetJsonString(p, "id"),
+                };
+
+                // Deck
+                var deck = new List<Dictionary<string, object?>>();
+                if (p.TryGetProperty("deck", out var deckEl) && deckEl.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var card in deckEl.EnumerateArray())
+                    {
+                        deck.Add(new Dictionary<string, object?>
+                        {
+                            ["id"] = ShortId(GetJsonString(card, "id")),
+                            ["current_upgrade_level"] = GetJsonInt(card, "current_upgrade_level"),
+                            ["floor_added_to_deck"] = GetJsonInt(card, "floor_added_to_deck"),
+                        });
+                    }
+                }
+                pf["deck"] = deck;
+
+                // Relics
+                var relics = new List<Dictionary<string, object?>>();
+                if (p.TryGetProperty("relics", out var relicsEl) && relicsEl.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var relic in relicsEl.EnumerateArray())
+                    {
+                        relics.Add(new Dictionary<string, object?>
+                        {
+                            ["id"] = ShortId(GetJsonString(relic, "id")),
+                        });
+                    }
+                }
+                pf["relics"] = relics;
+
+                // Potions
+                var potions = new List<Dictionary<string, object?>>();
+                if (p.TryGetProperty("potions", out var potionsEl) && potionsEl.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var potion in potionsEl.EnumerateArray())
+                    {
+                        potions.Add(new Dictionary<string, object?>
+                        {
+                            ["id"] = ShortId(GetJsonString(potion, "id")),
+                        });
+                    }
+                }
+                pf["potions"] = potions;
+
+                pf["max_potion_slot_count"] = p.TryGetProperty("max_potion_slot_count", out var mps)
+                    ? mps.GetInt32() : 0;
+
+                playersFinal.Add(pf);
+            }
+        }
+        hist["players_final"] = playersFinal;
+
+        result["historical"] = hist;
+
+        return JsonSerializer.Serialize(result, s_jsonOptions);
+    }
+
+    // -----------------------------------------------------------------------
     // BuildRunSummary: compact summary from a history .run file
     // -----------------------------------------------------------------------
 

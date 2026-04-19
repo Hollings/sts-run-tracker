@@ -56,6 +56,7 @@ public static class ApiHandlers
     }
 
     // GET /api/runs/{filename} -- null return signals HttpServer to send 404
+    // Returns MergedLiveData format enriched with historical metadata (win, deck, relics, etc.)
     public static string HandleRunDetail(string filename)
     {
         try
@@ -63,7 +64,28 @@ public static class ApiHandlers
             var run = SaveFileReader.LoadRun(filename);
             if (run == null)
                 return null!;
-            return JsonSerializer.Serialize(run, s_jsonOptions);
+
+            // Find matching tracker data by seed
+            string seed = "";
+            if (run.TryGetValue("seed", out var seedEl) && seedEl.ValueKind == JsonValueKind.String)
+                seed = seedEl.GetString() ?? "";
+
+            long startTime = 0;
+            if (run.TryGetValue("start_time", out var stEl) && stEl.ValueKind == JsonValueKind.Number)
+                startTime = stEl.GetInt64();
+
+            RunTrackerData? tracker = null;
+            if (!string.IsNullOrEmpty(seed))
+            {
+                var trackerFiles = SaveFileReader.FindTrackerFilesForSeed(seed, startTime);
+                if (trackerFiles.Count > 0)
+                {
+                    tracker = SaveFileReader.LoadTrackerFile(trackerFiles[0]);
+                    ModEntry.Log($"Matched tracker file for historical run seed={seed}: {trackerFiles[0]}");
+                }
+            }
+
+            return MergeEngine.MergeHistoricalRun(tracker, run);
         }
         catch (Exception ex)
         {
