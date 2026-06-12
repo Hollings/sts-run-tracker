@@ -55,8 +55,9 @@ def kick():
     f = 150 * np.exp(-t * 22) + 44
     ph = 2 * np.pi * np.cumsum(f) / SR
     body = np.sin(ph) * np.exp(-t * 11)
+    body = np.tanh(body * 2.4) * 0.9   # drive it: harder, more aggressive
     click = highpass(rng.standard_normal(len(t)) * np.exp(-t * 250), 3000)
-    return body * 1.0 + click * 0.4
+    return body * 1.0 + click * 0.45
 
 
 def clap():
@@ -162,10 +163,14 @@ def bar_t(bar, beat=0.0):  # bar is 0-indexed
 
 K, CL, HC, HO = kick(), clap(), hat(False), hat(True)
 
-# --- intro (bars 0-1): sparse kicks building, pad swell, riser ---
+# --- cold open (bar 0): full hits on every beat (word slams) ---
 place(music, bar_t(0), pad_chord([45, 57, 60, 64], BAR * 2, cutoff=900), 0.7)
-for b, g in [(0, 0.5), (1, 0.6), (2, 0.7), (3, 0.8), (4, 0.9), (5, 0.95), (6, 1.0), (7, 1.0)]:
-    place(drums, bar_t(0, b * 1.0), K, g * 0.8)
+for b in range(4):
+    place(drums, bar_t(0, b), K, 1.0)
+    place(drums, bar_t(0, b), CL, 0.7)
+# bar 1: stats machine gun - kicks every beat + building
+for b in range(4):
+    place(drums, bar_t(1, b), K, 0.85 + 0.05 * b)
 # snare roll, last half of bar 2
 for i in range(8):
     place(drums, bar_t(1, 2 + i * 0.25), CL, 0.3 + 0.08 * i)
@@ -208,19 +213,21 @@ for bar in range(2, 14):
             m = seq[i % 4] + (12 if (bar >= 10 and i % 8 >= 4) else 0)
             place(music, bar_t(bar, i * 0.25), pluck(midi_f(m)), 0.30)
 
-# --- bar 14: ominous turn (lathrys "ominous output from fable") ---
-# keep kick, drop everything bright, add dark drone + riser
-for b in range(4):
-    place(drums, bar_t(14, b), K, 1.0)
-place(drums, bar_t(14, 1), CL, 0.8)
-place(drums, bar_t(14, 3), CL, 0.8)
+# --- whoosh + impact at every card boundary (cards start bar 2, every 1.5 bars) ---
+for k in range(1, 8):
+    bt = bar_t(2) + k * BAR * 1.5
+    place(music, bt - 0.38, riser(0.38), 0.55)
+    place(drums, bt, impact(), 0.6)
+    place(drums, bt, crash(0.7), 0.28)
+
+# --- bar 14: tape-stop aftermath -- ominous drone + heartbeat kicks (outro pt.1) ---
 dt = t_axis(BAR)
 drone = (np.sin(2 * np.pi * 55 * dt) + 0.5 * np.sin(2 * np.pi * 55 * 1.5 * dt)
-         + 0.3 * np.sin(2 * np.pi * 58.27 * dt))  # adds a minor-second beat = unease
+         + 0.3 * np.sin(2 * np.pi * 58.27 * dt))  # minor-second beat = unease
 place(music, bar_t(14), drone * np.minimum(1, dt * 8) * 0.5, 0.9)
-place(music, bar_t(14), riser(BAR), 0.85)
-for i in range(8):
-    place(drums, bar_t(14, 2 + i * 0.25), CL, 0.35 + 0.1 * i)
+for bt_, g in [(0, 0.85), (0.45, 0.55), (2, 0.85), (2.45, 0.55)]:  # heartbeat lub-dub
+    place(drums, bar_t(14, bt_), K, g)
+place(music, bar_t(14, 2), riser(BAR / 2), 0.8)
 
 # --- bar 15: final hit + outro chord ---
 place(drums, bar_t(15), crash(2.2), 0.9)
@@ -242,6 +249,14 @@ music *= duck
 # ---------- mix, stereo, master ----------
 mono = drums * 0.9 + music * 0.8
 mono = np.tanh(mono * 1.4) * 0.85
+
+# tape-stop: varispeed slowdown over the 0.45s leading into bar 14
+ts_end = int(bar_t(14) * SR)
+ts_len = int(0.45 * SR)
+seg = mono[ts_end - ts_len:ts_end].copy()
+speed = np.linspace(1.0, 0.02, ts_len)
+idx = np.clip(np.cumsum(speed), 0, ts_len - 1).astype(int)
+mono[ts_end - ts_len:ts_end] = seg[idx] * np.linspace(1.0, 0.4, ts_len)
 
 # cheap stereo: haas-delayed copy mixed differently per side
 delay = int(0.012 * SR)
