@@ -112,6 +112,42 @@ internal static class EnchantmentTests
                     await CharTestHelpers.PlayCard(h, card);
                     return TestHelpers.Expect(before - h.Dummy.CurrentHp, 48, "damage");
                 }),
+
+            // ── Auto-play vs replay: the asymmetry ────────────────────────
+            // Replay (above) re-runs the card at the X you PAID. The OTHER
+            // multi-play family — auto-play-ANOTHER-card (Catastrophe, Beat
+            // Down, Stampede, Bombardment, ...) — plays a card WITHOUT paying,
+            // capturing X = CURRENT energy and not consuming it. So an X-cost
+            // card auto-played at 3 energy does X=3 and leaves the 3 energy.
+            await CharTestHelpers.Test<Ironclad>(
+                "Auto-played Skewer uses current energy as X (24, energy untouched)",
+                new List<Harness.DeckEntry> { new(typeof(Skewer)) },
+                async h =>
+                {
+                    var pcs = h.Player.PlayerCombatState!;
+                    Reflect.SetEnergy(pcs, 3);
+                    var card = CharTestHelpers.MoveToHand(h, typeof(Skewer))!;
+                    var before = h.Dummy.CurrentHp;
+                    await MegaCrit.Sts2.Core.Commands.CardCmd.AutoPlay(h.Ctx, card, h.Dummy);
+                    return TestHelpers.Expect(before - h.Dummy.CurrentHp, 24, "damage")
+                        ?? TestHelpers.Expect(pcs.Energy, 3, "energy (auto-play is free)");
+                }),
+
+            // The "doesn't do the full X effect" case: this is exactly what
+            // happens when Stampede fires its random attacks at END of turn,
+            // after you've spent your energy — an X-cost card auto-plays at
+            // X=0 and does nothing.
+            await CharTestHelpers.Test<Ironclad>(
+                "Auto-played Skewer at 0 energy does nothing (X=0)",
+                new List<Harness.DeckEntry> { new(typeof(Skewer)) },
+                async h =>
+                {
+                    Reflect.SetEnergy(h.Player.PlayerCombatState!, 0);
+                    var card = CharTestHelpers.MoveToHand(h, typeof(Skewer))!;
+                    var before = h.Dummy.CurrentHp;
+                    await MegaCrit.Sts2.Core.Commands.CardCmd.AutoPlay(h.Ctx, card, h.Dummy);
+                    return TestHelpers.Expect(before - h.Dummy.CurrentHp, 0, "damage");
+                }),
         };
 
         return results;
