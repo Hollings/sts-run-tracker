@@ -23,6 +23,7 @@ internal static class EnchantmentTests
         var instinctId = ModelDb.Enchantment<Instinct>().Id.ToString();
         var sharpId = ModelDb.Enchantment<Sharp>().Id.ToString();
         var nimbleId = ModelDb.Enchantment<Nimble>().Id.ToString();
+        var glamId = ModelDb.Enchantment<Glam>().Id.ToString();
 
         var results = new List<TestHelpers.TestResult>
         {
@@ -76,6 +77,40 @@ internal static class EnchantmentTests
                     var before = h.Dummy.CurrentHp;
                     await CharTestHelpers.PlayCard(h, card);
                     return TestHelpers.Expect(before - h.Dummy.CurrentHp, 18, "damage");
+                }),
+
+            // ── Replay × X-cost ───────────────────────────────────────────
+            // Control: Skewer is X-cost, 8 damage per hit, hits = X. At 3
+            // energy → 3 hits → 24. SpendResources captures X=3.
+            await CharTestHelpers.Test<Ironclad>(
+                "Skewer X=3 deals 24 (no replay)",
+                new List<Harness.DeckEntry> { new(typeof(Skewer)) },
+                async h =>
+                {
+                    Reflect.SetEnergy(h.Player.PlayerCombatState!, 3);
+                    var card = CharTestHelpers.MoveToHand(h, typeof(Skewer))!;
+                    var before = h.Dummy.CurrentHp;
+                    await CharTestHelpers.PlayCard(h, card);
+                    return TestHelpers.Expect(before - h.Dummy.CurrentHp, 24, "damage");
+                }),
+
+            // The question: does Replay work with an X-cost card? Glam adds
+            // +1 play (playCount=2). The X value is captured ONCE before the
+            // OnPlayWrapper replay loop and must persist across iterations —
+            // if the second play re-captured X it would see 0 energy → 0
+            // hits → 24. Correct game behavior: both plays use X=3 → 48.
+            await CharTestHelpers.Test<Ironclad>(
+                "Skewer X=3 + Glam replays at the captured X (48, not 24)",
+                new List<Harness.DeckEntry> { new(typeof(Skewer), 0, glamId) },
+                async h =>
+                {
+                    Reflect.SetEnergy(h.Player.PlayerCombatState!, 3);
+                    var card = CharTestHelpers.MoveToHand(h, typeof(Skewer))!;
+                    if (card.GetEnchantedReplayCount() != 1)
+                        return $"Glam did not grant a replay (GetEnchantedReplayCount={card.GetEnchantedReplayCount()})";
+                    var before = h.Dummy.CurrentHp;
+                    await CharTestHelpers.PlayCard(h, card);
+                    return TestHelpers.Expect(before - h.Dummy.CurrentHp, 48, "damage");
                 }),
         };
 
